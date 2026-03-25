@@ -1025,6 +1025,11 @@
       padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;margin-left:auto">
       ⬇ Exportar tabla
     </button>
+    <button onclick="abrirExportarDesdeCont()"
+      style="background:var(--navy);color:#fff;border:none;border-radius:8px;
+      padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer">
+      💳 Exportar pagos banco
+    </button>
   </div>
   <table class="records-table">
     <thead>
@@ -1442,8 +1447,8 @@ function doGet(e) {
     }
 
     function col(row, nombre, fallback) {
-      var i = idx[nombre];
-      return (i !== undefined && row[i] !== undefined && row[i] !== null) ? row[i] : (fallback !== undefined ? fallback : '');
+      var i = idx[String(nombre).trim().toUpperCase()];
+      return (i !== undefined && row[i] !== undefined && row[i] !== null && row[i] !== '') ? row[i] : (fallback !== undefined ? fallback : '');
     }
 
     for (var i = 1; i < rows.length; i++) {
@@ -1473,10 +1478,24 @@ function doGet(e) {
         adelanto:        col(row, 'ADELANTO MOV VIAJERA'),
         rxh:             col(row, 'EMITIÓ RXH'),
         numRxh:          (() => {
-          const raw = String(col(row, '#RECIBO') || col(row, 'N° RECIBO') || col(row, 'RECIBO') || '');
-          // Si viene "E001-001, E001-002" normalizamos a "E001-001|E001-002"
-          if (raw && !raw.includes('::') && raw.includes(',')) {
-            return raw.split(',').map(s=>s.trim()).filter(Boolean).join('|');
+          // Probar todas las variantes posibles del header
+          const raw = String(
+            col(row, '# RECIBO') ||
+            col(row, '#RECIBO')  ||
+            col(row, 'N° RECIBO') ||
+            col(row, 'RECIBO')   ||
+            col(row, 'NUM RECIBO') ||
+            col(row, 'NUMERO RECIBO') ||
+            ''
+          ).trim();
+          if (!raw) return '';
+          // Si viene con formato serializado E001-001::fecha::monto — extraer solo números
+          if (raw.includes('::')) {
+            return raw.split('|').map(s => s.split('::')[0].trim()).filter(Boolean).join('|');
+          }
+          // Si viene "E001-001, E001-002" normalizar a pipe
+          if (raw.includes(',')) {
+            return raw.split(',').map(s => s.trim()).filter(Boolean).join('|');
           }
           return raw;
         })(),
@@ -2100,6 +2119,15 @@ async function cargarRegistrosDesdeSheets() {
     const data = await fetchScript({accion: 'registros'});
     if (data.registros) {
       registros = data.registros.map(r => ({...r, id: r.fila}));
+      // Debug: mostrar en consola los primeros registros con RxH para verificar
+      const conRxh = registros.filter(r => r.numRxh);
+      if (conRxh.length) {
+        console.log('Registros con numRxh:', conRxh.length, '— ejemplo:', conRxh[0].numRxh);
+      } else {
+        console.warn('Ningún registro tiene numRxh. Verificar header de columna Z en Sheet.');
+        // Mostrar todos los campos del primer registro para diagnóstico
+        if (registros[0]) console.log('Campos del primer registro:', Object.keys(registros[0]).join(', '));
+      }
     }
   } catch(e) { console.log('Error cargando registros:', e); }
 }
@@ -3794,6 +3822,38 @@ async function notificarPorEmail(tipo, registro, destinatario) {
       destinatario: destinatario || ''
     });
   } catch (e) { /* notificación silenciosa, no bloquear flujo */ }
+}
+
+// ── Exportar pagos banco desde Contabilidad (pre-filtra con filtros activos) ──
+function abrirExportarDesdeCont() {
+  // Tomar los filtros activos de Contabilidad y aplicarlos al panel exportar
+  const q = document.getElementById('cont-fil-quincena')?.value || '';
+  const c = document.getElementById('cont-fil-cliente')?.value  || '';
+  const p = document.getElementById('cont-fil-proyecto')?.value || '';
+
+  // Navegar al panel exportar
+  document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  document.getElementById('panel-exportar').classList.add('active');
+
+  // Esperar a que el panel esté visible y aplicar filtros
+  setTimeout(() => {
+    switchToExportar();
+    if (q) {
+      const sel = document.getElementById('exp-quincena');
+      if (sel) sel.value = q;
+    }
+    if (c) {
+      const sel = document.getElementById('exp-cliente');
+      if (sel) sel.value = c;
+    }
+    if (p) {
+      const sel = document.getElementById('exp-proyecto');
+      if (sel) sel.value = p;
+    }
+    // Auto-previsualizar
+    previsualizarReporte();
+  }, 100);
 }
 
 // ── Helpers para botones de Nuevo Registro ──
