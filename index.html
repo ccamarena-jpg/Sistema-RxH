@@ -1564,6 +1564,16 @@ function doGet(e) {
     return respond({status:'ok'});
   }
 
+  // ── ELIMINAR FILA ──────────────────────────────────────────
+  if (accion === 'eliminar') {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('REGISTROS');
+    var fila  = parseInt(e.parameter.fila);
+    if (fila > 1) {
+      sheet.deleteRow(fila);
+    }
+    return respond({status:'ok'});
+  }
+
   return respond({error:'accion no reconocida'});
 }</div>
     </div>
@@ -2313,6 +2323,11 @@ function renderTablaCuentas(filtro) {
             ${r.estado === 'EN REVISIÓN CUENTAS' ? `
               <button class="act-btn act-approve" onclick="aprobarCuentas(${r.id})">Aprobar</button>
               <button class="act-btn act-observe" onclick="abrirObservacion(${r.id},'cuentas')">Observar</button>
+              <button class="act-btn" onclick="confirmarEliminar(${r.id})"
+                style="background:rgba(217,53,53,0.1);color:var(--red);border:1px solid rgba(217,53,53,0.3);
+                border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer">
+                🗑 Eliminar
+              </button>
             ` : ''}
             ${r.estado === 'OBSERVADO-CUENTAS' ? `
               <button class="act-btn act-approve" onclick="abrirEditarMonto(${r.id})" style="background:rgba(217,115,32,0.15);color:var(--orange)">✏ Corregir</button>
@@ -2337,6 +2352,50 @@ function filterStatus(el, filtro) {
   document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
   renderTablaCuentas(filtro);
+}
+
+// ── ELIMINAR REGISTRO (solo EN REVISIÓN CUENTAS) ─────────────────
+function confirmarEliminar(id) {
+  const r = registros.find(x => x.id === id);
+  if (!r) return;
+  const ok = confirm(
+    `⚠️ ELIMINAR REGISTRO\n\n` +
+    `¿Estás seguro de que deseas eliminar este registro?\n\n` +
+    `• Trabajador: ${r.nombre}\n` +
+    `• Proyecto: ${r.proyecto}\n` +
+    `• Quincena: ${r.quincena}\n` +
+    `• Total: S/. ${parseFloat(r.total||0).toFixed(2)}\n\n` +
+    `Esta acción no se puede deshacer.`
+  );
+  if (ok) eliminarRegistro(id);
+}
+
+async function eliminarRegistro(id) {
+  const r = registros.find(x => x.id === id);
+  if (!r) return;
+
+  // Solo permitir eliminar si está en revisión inicial
+  if (r.estado !== 'EN REVISIÓN CUENTAS') {
+    showToast('Solo se pueden eliminar registros en estado "En revisión"', true);
+    return;
+  }
+
+  // Eliminar de memoria inmediatamente para feedback rápido
+  registros = registros.filter(x => x.id !== id);
+  renderTablaCuentas(cuentasFiltroActivo);
+  showToast('✓ Registro eliminado');
+
+  // Eliminar en Google Sheets
+  if (SCRIPT_URL) {
+    try {
+      await fetchScript({
+        accion:  'eliminar',
+        fila:    r.fila
+      });
+    } catch(e) {
+      showToast('Eliminado localmente — verifica en Sheets', true);
+    }
+  }
 }
 
 async function aprobarCuentas(id) {
@@ -2999,6 +3058,7 @@ const ADMINS = [
   'rgallo@ttaudit.com',
   'apablo@ttaudit.com',
   'contabilidad@ttaudit.com',
+  'egutierrez@ttaudit.com',
 ];
 
 function onGoogleLogin(response) {
