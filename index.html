@@ -2042,6 +2042,19 @@ async function guardarRegistro() {
     }
   }
 
+  // Validación de duplicados
+  const _dni      = document.getElementById('f-dni').value.trim();
+  const _proyecto = document.getElementById('f-proyecto').value;
+  const _quincena = document.getElementById('f-quincena').value;
+  if (_dni && _proyecto && _quincena && esDuplicado(_dni, _proyecto, _quincena)) {
+    const ok = confirm(
+      `⚠️ DUPLICADO DETECTADO\n\nYa existe un registro para:\n` +
+      `• DNI: ${_dni}\n• Proyecto: ${_proyecto}\n• Quincena: ${_quincena}\n\n` +
+      `¿Deseas guardar de todas formas?`
+    );
+    if (!ok) return;
+  }
+
   const totalStr = document.getElementById('f-total').textContent.replace('S/. ','');
   const dias     = parseFloat(document.getElementById('f-dias').value) || 0;
   const pagoDia  = parseFloat(document.getElementById('f-pago-dia').value) || 0;
@@ -2229,25 +2242,45 @@ function poblarFiltrosCuentas() {
   const selS = document.getElementById('cuentas-fil-supervisor');
   if (!selQ) return;
 
-  const prevQ = selQ.value, prevC = selC.value, prevS = selS.value;
+  // Para supervisores: forzar siempre su nombre y bloquear el filtro
+  const esSupervisor = currentUser && currentUser.role === 'supervisor';
+  const nombreSup    = esSupervisor ? currentUser.supervisor : null;
 
-  const quincenas    = [...new Set(registros.map(r=>r.quincena).filter(Boolean))].sort().reverse();
-  const clientes     = [...new Set(registros.map(r=>r.cliente).filter(Boolean))].sort();
+  const prevQ = selQ.value;
+  const prevC = selC.value;
+  // Si es supervisor, siempre usar su nombre; si no, conservar el valor previo
+  const prevS = esSupervisor ? nombreSup : selS.value;
+
+  // Filtrar registros base: si supervisor, solo los suyos
+  const base = esSupervisor
+    ? registros.filter(r => r.supervisor === nombreSup)
+    : registros;
+
+  const quincenas    = [...new Set(base.map(r=>r.quincena).filter(Boolean))].sort().reverse();
+  const clientes     = [...new Set(base.map(r=>r.cliente).filter(Boolean))].sort();
   const supervisores = [...new Set(registros.map(r=>r.supervisor).filter(Boolean))].sort();
 
   selQ.innerHTML = '<option value="">Todas</option>';
   quincenas.forEach(q => selQ.innerHTML += `<option ${q===prevQ?'selected':''}>${q}</option>`);
   selC.innerHTML = '<option value="">Todos</option>';
   clientes.forEach(c => selC.innerHTML += `<option ${c===prevC?'selected':''}>${c}</option>`);
-  selS.innerHTML = '<option value="">Todos</option>';
-  supervisores.forEach(s => selS.innerHTML += `<option ${s===prevS?'selected':''}>${s}</option>`);
+
+  if (esSupervisor) {
+    // Supervisor solo ve su nombre, sin opción de cambiar
+    selS.innerHTML = `<option value="${nombreSup}" selected>${nombreSup}</option>`;
+    selS.disabled  = true;
+  } else {
+    selS.disabled  = false;
+    selS.innerHTML = '<option value="">Todos</option>';
+    supervisores.forEach(s => selS.innerHTML += `<option ${s===prevS?'selected':''}>${s}</option>`);
+  }
 
   // Poblar proyectos según cliente seleccionado (sin llamar a render)
   const selProy2 = document.getElementById('cuentas-fil-proyecto');
   if (selProy2) {
     const prevProy = selProy2.value;
     const proyectos = [...new Set(
-      registros.filter(r => !prevC || r.cliente === prevC).map(r=>r.proyecto).filter(Boolean)
+      base.filter(r => !prevC || r.cliente === prevC).map(r=>r.proyecto).filter(Boolean)
     )].sort();
     selProy2.innerHTML = '<option value="">Todos</option>';
     proyectos.forEach(p => selProy2.innerHTML += `<option ${p===prevProy?'selected':''}>${p}</option>`);
@@ -2294,13 +2327,15 @@ function renderTablaCuentas(filtro) {
   const tbody = document.getElementById('tbody-cuentas');
 
   let lista = registros.filter(r => {
+    // Supervisores solo ven sus propios registros — siempre
+    if (currentUser && currentUser.role === 'supervisor' && r.supervisor !== currentUser.supervisor) return false;
     if (filQ && r.quincena   !== filQ) return false;
     if (filC && r.cliente    !== filC) return false;
     if (filP && r.proyecto   !== filP) return false;
     if (filS && r.supervisor !== filS) return false;
-    if (filtro === 'revision')  return r.estado === 'EN REVISIÓN CUENTAS';
-    if (filtro === 'observado') return r.estado === 'OBSERVADO-CUENTAS';
-    if (filtro === 'aprobado')  return r.estado === 'APROBADO CUENTAS';
+    if (filtro === 'revision')  return (r.estado||'').toUpperCase().includes('REVISI') && (r.estado||'').toUpperCase().includes('CUENTA');
+    if (filtro === 'observado') return (r.estado||'').toUpperCase().includes('OBSERVADO') && (r.estado||'').toUpperCase().includes('CUENTA');
+    if (filtro === 'aprobado')  return (r.estado||'').toUpperCase().includes('APROBADO') && (r.estado||'').toUpperCase().includes('CUENTA');
     return true;
   });
 
@@ -3113,12 +3148,12 @@ function aplicarRol() {
   }
 
   if (currentUser.role === 'supervisor') {
-    // Supervisores solo ven: Nuevo Registro, Ingresar RxH, Dashboard
+    // Supervisores ven: Nuevo Registro, Cuentas (solo sus registros), Ingresar RxH
     document.querySelectorAll('.tab-btn').forEach(btn => {
       const t = btn.textContent.trim();
-      if (t === 'Cuentas')      btn.style.display = 'none';
       if (t === 'Contabilidad') btn.style.display = 'none';
       if (t === 'Carga Masiva') btn.style.display = 'none';
+      if (t === 'Dashboard')    btn.style.display = 'none';
     });
   }
 }
@@ -3457,24 +3492,6 @@ function esDuplicado(dni, proyecto, quincena) {
     r.proyecto === proyecto &&
     r.quincena === quincena
   );
-}
-
-// Patch guardarRegistro para incluir validación de duplicados
-const _guardarRegistroOrig = guardarRegistro;
-async function guardarRegistro() {
-  const dni       = document.getElementById('f-dni').value.trim();
-  const proyecto  = document.getElementById('f-proyecto').value;
-  const quincena  = document.getElementById('f-quincena').value;
-
-  if (dni && proyecto && quincena && esDuplicado(dni, proyecto, quincena)) {
-    const ok = confirm(
-      `⚠️ DUPLICADO DETECTADO\n\nYa existe un registro para:\n` +
-      `• DNI: ${dni}\n• Proyecto: ${proyecto}\n• Quincena: ${quincena}\n\n` +
-      `¿Deseas guardar de todas formas?`
-    );
-    if (!ok) return;
-  }
-  await _guardarRegistroOrig();
 }
 
 // ════════════════════════════════════════════════════════════════
