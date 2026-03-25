@@ -1857,6 +1857,16 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
   event.currentTarget.classList.add('active');
+  if (tab === 'registro') {
+    // Asegurar que los desplegables estén cargados cada vez que se abre el formulario
+    if (!window._proyectosData || Object.keys(window._proyectosData).length === 0) {
+      cargarProyectos();
+    } else {
+      // Re-llenar el select por si acaso
+      const selCliente = document.getElementById('f-cliente');
+      if (selCliente && selCliente.options.length <= 1) cargarProyectos();
+    }
+  }
   if (tab === 'rxh') {
     cargarRegistrosDesdeSheets().then(() => renderTablaRxH());
   }
@@ -4037,6 +4047,8 @@ function exportarDatosCuentas() {
 // Init
 async function init() {
   if (SCRIPT_URL) {
+    // Siempre recargar proyectos frescos para garantizar que los selects estén llenos
+    window._proyectosData = {};
     await cargarProyectos();
     cargarRegistrosDesdeSheets().then(() => renderTablaCuentas('todos'));
   } else {
