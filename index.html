@@ -1829,7 +1829,9 @@ function fetchScript(params) {
 }
 
 // ── CONFIG ──
-let SCRIPT_URL = localStorage.getItem('rxh_script_url') || '';
+let SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx3pfTFrHzdzhLCUIAKFCTNpWClhTA0L9niWDRMYK98v-gBAKDuys0N7_g3roAFrJPb/exec';
+// También guardar en localStorage por compatibilidad
+localStorage.setItem('rxh_script_url', SCRIPT_URL);
 
 // ── DATOS ──
 let proyectosPorCliente = {}; // se llena desde Sheets
