@@ -1858,14 +1858,8 @@ function switchTab(tab) {
   document.getElementById('panel-' + tab).classList.add('active');
   event.currentTarget.classList.add('active');
   if (tab === 'registro') {
-    // Asegurar que los desplegables estén cargados cada vez que se abre el formulario
-    if (!window._proyectosData || Object.keys(window._proyectosData).length === 0) {
-      cargarProyectos();
-    } else {
-      // Re-llenar el select por si acaso
-      const selCliente = document.getElementById('f-cliente');
-      if (selCliente && selCliente.options.length <= 1) cargarProyectos();
-    }
+    // Siempre recargar proyectos al abrir el formulario — garantiza selects llenos para todos
+    cargarProyectos();
   }
   if (tab === 'rxh') {
     cargarRegistrosDesdeSheets().then(() => renderTablaRxH());
@@ -1891,10 +1885,13 @@ function switchTab(tab) {
 // ── CARGAR PROYECTOS DESDE SHEETS ──
 async function cargarProyectos() {
   if (!SCRIPT_URL) return;
+
+  // Mostrar estado de carga en el select
+  const selCliente = document.getElementById('f-cliente');
+  if (selCliente) selCliente.innerHTML = '<option value="">Cargando...</option>';
+
   try {
-    console.log('Llamando proyectos con URL:', SCRIPT_URL);
     const data = await fetchScript({accion: 'proyectos'});
-    console.log('Proyectos recibidos:', data);
     if (!data.proyectos) return;
 
     // Construir mapa cliente -> proyectos y lista de supervisores
@@ -1941,10 +1938,21 @@ async function cargarProyectos() {
 
     console.log('Proyectos cargados OK:', Object.keys(window._proyectosData));
 
+    // Verificar que el select realmente se llenó — si no, es un problema de DOM
+    const selCheck = document.getElementById('f-cliente');
+    if (selCheck && selCheck.options.length <= 1) {
+      // El select existe pero quedó vacío — reintentar una vez después de 500ms
+      setTimeout(() => cargarProyectos(), 500);
+    }
+
   } catch(e) {
     console.error('Error cargando proyectos:', e);
     const selCliente = document.getElementById('f-cliente');
-    if (selCliente) selCliente.innerHTML = '<option value="">Error: ' + e.message + '</option>';
+    if (selCliente) {
+      selCliente.innerHTML = '<option value="">⚠ Error al cargar — reintentando...</option>';
+      // Reintentar automáticamente después de 3 segundos
+      setTimeout(() => cargarProyectos(), 3000);
+    }
   }
 }
 
@@ -3143,8 +3151,17 @@ function onGoogleLogin(response) {
   // Aplicar restricciones de UI según rol
   aplicarRol();
 
-  // Arrancar app
-  init();
+  // Arrancar app — con pequeño delay para asegurar que el DOM está listo
+  setTimeout(async () => {
+    window._proyectosData = {};
+    await cargarProyectos();
+    // Forzar llenado del select si aún está vacío
+    const selCliente = document.getElementById('f-cliente');
+    if (selCliente && selCliente.options.length <= 1 && SCRIPT_URL) {
+      await cargarProyectos();
+    }
+    cargarRegistrosDesdeSheets().then(() => renderTablaCuentas('todos'));
+  }, 200);
 }
 
 function aplicarRol() {
