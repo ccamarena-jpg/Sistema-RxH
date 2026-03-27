@@ -1806,32 +1806,61 @@ function doGet(e) {
 <script>
 // ── FETCH VIA JSONP (evita CORS en Apps Script) ──
 function fetchScript(params) {
+  // Intenta JSONP primero; si falla en 8s, usa fetch() como fallback
   return new Promise((resolve, reject) => {
     const cbName = 'cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const qs = Object.entries({...params, callback: cbName})
       .map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))
       .join('&');
+    const url = SCRIPT_URL + '?' + qs;
+
+    let settled = false;
+    const settle = (fn, val) => {
+      if (settled) return;
+      settled = true;
+      fn(val);
+    };
+
+    // ── JSONP path ──
     const script = document.createElement('script');
-    script.src = SCRIPT_URL + '?' + qs;
+    script.src = url;
     window[cbName] = (data) => {
       delete window[cbName];
-      document.body.removeChild(script);
-      resolve(data);
+      try { document.body.removeChild(script); } catch(e) {}
+      settle(resolve, data);
     };
     script.onerror = () => {
       delete window[cbName];
-      document.body.removeChild(script);
-      reject(new Error('Failed to fetch'));
+      try { document.body.removeChild(script); } catch(e) {}
+      // Fallback: fetch sin callback
+      fetchScriptFallback(params).then(d => settle(resolve, d)).catch(e => settle(reject, e));
     };
     document.body.appendChild(script);
+
+    // Timeout 8s → fallback fetch
     setTimeout(() => {
-      if (window[cbName]) {
+      if (!settled) {
         delete window[cbName];
         try { document.body.removeChild(script); } catch(e) {}
-        reject(new Error('Timeout'));
+        fetchScriptFallback(params).then(d => settle(resolve, d)).catch(e => settle(reject, e));
       }
-    }, 30000);
+    }, 8000);
   });
+}
+
+// Fallback usando fetch() directo (sin callback) para Safari / móviles estrictos
+function fetchScriptFallback(params) {
+  const qs = Object.entries(params)
+    .map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))
+    .join('&');
+  const url = SCRIPT_URL + '?' + qs;
+  return fetch(url, { method: 'GET' })
+    .then(r => r.text())
+    .then(text => {
+      // Apps Script puede devolver JSON plano o envuelto en callback(...)
+      const clean = text.replace(/^[\w$]+\(/, '').replace(/\)\s*;?\s*$/, '').trim();
+      return JSON.parse(clean);
+    });
 }
 
 // ── CONFIG ──
@@ -1958,9 +1987,9 @@ async function cargarProyectos() {
     console.error('Error cargando proyectos:', e);
     const selCliente = document.getElementById('f-cliente');
     if (selCliente) {
-      selCliente.innerHTML = '<option value="">⚠ Error al cargar — reintentando...</option>';
-      // Reintentar automáticamente después de 3 segundos
-      setTimeout(() => cargarProyectos(), 3000);
+      selCliente.innerHTML = '<option value="">⚠ Toca aquí para reintentar</option>';
+      selCliente.addEventListener('focus', function reintento() { cargarProyectos(); }, { once: true });
+      setTimeout(() => { if (selCliente.options.length <= 1) cargarProyectos(); }, 5000);
     }
   }
 }
