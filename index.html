@@ -2460,14 +2460,10 @@ function renderTablaCuentas(filtro) {
         <td>${ESTADO_PILL[r.estado] || r.estado}</td>
         <td>
           <div class="action-btns">
-            ${(r.estado === 'EN REVISIÓN CUENTAS' || (r.estado||'').toUpperCase().includes('REVISI') && (r.estado||'').toUpperCase().includes('CUENTA')) ? `
-              ${currentUser && currentUser.role !== 'supervisor' ? '<button class="act-btn act-approve" onclick="aprobarCuentas('+r.id+')">Aprobar</button><button class="act-btn act-observe" onclick="abrirObservacion('+r.id+',\'cuentas\')">Observar</button>' : ''}
-              <button class="act-btn" onclick="confirmarEliminar(${r.id})"
-                style="background:rgba(217,53,53,0.1);color:var(--red);border:1px solid rgba(217,53,53,0.3);
-                border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer">
-                🗑 Eliminar
-              </button>
-            ` : ''}
+            ${(r.estado === 'EN REVISIÓN CUENTAS' || (r.estado||'').toUpperCase().includes('REVISI') && (r.estado||'').toUpperCase().includes('CUENTA')) ? (
+              (currentUser && currentUser.role !== 'supervisor' ? '<button class="act-btn act-approve" onclick="aprobarCuentas('+r.id+')">Aprobar</button><button class="act-btn act-observe" onclick="abrirObservacion('+r.id+',\'cuentas\')">Observar</button>' : '') +
+              '<button class="act-btn" onclick="confirmarEliminar('+r.id+')" style="background:rgba(217,53,53,0.1);color:var(--red);border:1px solid rgba(217,53,53,0.3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;cursor:pointer">🗑 Eliminar</button>'
+            ) : ''}
             ${(r.estado === 'OBSERVADO-CUENTAS' || (r.estado||'').toUpperCase().includes('OBSERVADO') && (r.estado||'').toUpperCase().includes('CUENTA')) ? `
               <button class="act-btn act-approve" onclick="abrirEditarMonto(${r.id})" style="background:rgba(217,115,32,0.15);color:var(--orange)">✏ Corregir</button>
             ` : ''}
