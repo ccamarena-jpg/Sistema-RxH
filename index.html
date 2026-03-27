@@ -2481,6 +2481,19 @@ function renderTablaCuentas(filtro) {
   document.getElementById('stat-observados').textContent = lista.filter(r=>r.estado==='OBSERVADO-CUENTAS').length;
   const tot = lista.reduce((s,r)=>s+parsearTotal(r.total),0);
   document.getElementById('stat-total').textContent = 'S/. ' + tot.toLocaleString('es-PE',{minimumFractionDigits:0});
+
+  // Ocultar botones Aprobar/Observar y checkboxes para supervisores
+  if (currentUser && currentUser.role === 'supervisor') {
+    document.querySelectorAll('#tbody-cuentas .act-approve, #tbody-cuentas .act-observe').forEach(function(btn) {
+      var t = btn.textContent.trim();
+      if (t === 'Aprobar' || t === 'Observar') btn.style.display = 'none';
+    });
+    document.querySelectorAll('#tbody-cuentas .chk-cuentas').forEach(function(chk) { chk.style.display = 'none'; });
+    var chkAll = document.getElementById('chk-all-cuentas');
+    if (chkAll) chkAll.style.display = 'none';
+    var btnSel = document.getElementById('btn-aprobar-sel-cuentas');
+    if (btnSel) btnSel.style.display = 'none';
+  }
 }
 
 function filterStatus(el, filtro) {
