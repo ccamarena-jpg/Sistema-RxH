@@ -1893,7 +1893,17 @@ function switchTab(tab) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
-  event.currentTarget.classList.add('active');
+  // Marcar el botón de pestaña activo — puede venir de un click o llamarse directo
+  if (typeof event !== 'undefined' && event && event.currentTarget) {
+    event.currentTarget.classList.add('active');
+  } else {
+    // Buscar el botón por el panel que activa
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      if (b.getAttribute('onclick') && b.getAttribute('onclick').includes("'" + tab + "'")) {
+        b.classList.add('active');
+      }
+    });
+  }
   if (tab === 'registro') {
     // Siempre recargar proyectos al abrir el formulario — garantiza selects llenos para todos
     cargarProyectos();
@@ -3241,7 +3251,6 @@ function aplicarRol() {
     document.querySelectorAll('.tab-btn').forEach(btn => {
       const t = btn.textContent.trim();
       if (t === 'Contabilidad') btn.style.display = 'none';
-      if (t === 'Carga Masiva') btn.style.display = 'none';
       if (t === 'Dashboard')    btn.style.display = 'none';
     });
   }
@@ -4025,39 +4034,11 @@ function abrirExportarDesdeCont() {
 
 // ── Helpers para botones de Nuevo Registro ──
 function abrirExportar() {
-  // Abrir panel exportar en nueva ventana/tab usando el mismo sistema
-  const url = window.location.href;
-  const win = window.open(url, '_blank');
-  if (win) {
-    // Cuando cargue, ir al tab exportar
-    win.addEventListener('load', () => {
-      try { win.switchTab && win.switchTab('exportar'); } catch(e) {}
-    });
-    showToast('Abriendo exportar en nueva pestaña...');
-  } else {
-    // Si bloquea popups, navegar en la misma ventana al panel exportar
-    cargarRegistrosDesdeSheets().then(() => {
-      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-      document.getElementById('panel-exportar').classList.add('active');
-      switchToExportar();
-    });
-  }
+  switchTab('exportar');
 }
 
 function abrirCargaMasiva() {
-  const url = window.location.href;
-  const win = window.open(url, '_blank');
-  if (win) {
-    showToast('Abriendo carga masiva en nueva pestaña...');
-    win.addEventListener('load', () => {
-      try { win.switchTab && win.switchTab('carga'); } catch(e) {}
-    });
-  } else {
-    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-    document.getElementById('panel-carga').classList.add('active');
-  }
+  switchTab('carga');
 }
 
 // ── Exportar datos de Cuentas (todos los visibles según filtros activos) ──
