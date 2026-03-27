@@ -876,12 +876,7 @@
         <option value="">Todos</option>
       </select>
     </div>
-    <div class="field" style="margin:0;min-width:140px">
-      <label style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Ejecutivo</label>
-      <select id="cuentas-fil-ejecutivo" onchange="renderTablaCuentas(cuentasFiltroActivo)" style="width:100%;padding:7px 12px;border-radius:6px;border:1px solid var(--border);font-size:13px;background:#fff;color:var(--text)">
-        <option value="">Todos</option>
-      </select>
-    </div>
+
     <button onclick="limpiarFiltrosCuentas()" style="padding:7px 16px;border-radius:6px;border:1px solid var(--border);background:#fff;font-size:12px;color:var(--text-muted);cursor:pointer;margin-top:16px">✕ Limpiar</button>
   </div>
 
@@ -2292,7 +2287,7 @@ function exportarTablaContabilidad() {
     if (filQ && r.quincena   !== filQ) return false;
     if (filC && r.cliente    !== filC) return false;
     if (filP && r.proyecto   !== filP) return false;
-    if (filS && r.supervisor !== filS) return false;
+    if (filS && !esMismoSupervisor(r.supervisor, filS)) return false;
     return true;
   });
 
@@ -2324,7 +2319,6 @@ function poblarFiltrosCuentas() {
   const selQ = document.getElementById('cuentas-fil-quincena');
   const selC = document.getElementById('cuentas-fil-cliente');
   const selS = document.getElementById('cuentas-fil-supervisor');
-  const selE = document.getElementById('cuentas-fil-ejecutivo');
   if (!selQ) return;
 
   const esSupervisor = currentUser && currentUser.role === 'supervisor';
@@ -2333,33 +2327,15 @@ function poblarFiltrosCuentas() {
   const prevQ = selQ.value;
   const prevC = selC.value;
   const prevS = esSupervisor ? nombreSup : selS.value;
-  const prevE = selE ? selE.value : '';
 
   const base = esSupervisor
-    ? registros.filter(r => r.supervisor === nombreSup)
+    ? registros.filter(r => esMismoSupervisor(r.supervisor, nombreSup))
     : registros;
 
   const quincenas    = [...new Set(base.map(r=>r.quincena).filter(Boolean))].sort().reverse();
   const clientes     = [...new Set(base.map(r=>r.cliente).filter(Boolean))].sort();
   const supervisores = [...new Set(registros.map(r=>r.supervisor).filter(Boolean))].sort();
-  // Ejecutivo = gerente del proyecto (desde la hoja PROYECTOS)
-  const ejecutivos = [...new Set(
-    Object.values(window._proyectosData || {}).flatMap(proyectos =>
-      Object.keys(proyectos)
-    ).concat(
-      // También incluir nombres de gerentes si vienen en los registros
-      registros.map(r => r.aprobadoPor).filter(Boolean)
-    )
-  )].filter(Boolean).sort();
 
-  // Mejor: obtener gerentes directamente desde _proyectosData si está disponible
-  const gerentesSet = new Set();
-  if (window._proyectosRaw) {
-    window._proyectosRaw.forEach(p => { if (p.gerente) gerentesSet.add(p.gerente); });
-  }
-  // Fallback: usar aprobadoPor de registros
-  registros.forEach(r => { if (r.aprobadoPor) gerentesSet.add(r.aprobadoPor); });
-  const ejecutivosLista = [...gerentesSet].sort();
 
   selQ.innerHTML = '<option value="">Todas</option>';
   quincenas.forEach(q => selQ.innerHTML += `<option ${q===prevQ?'selected':''}>${q}</option>`);
@@ -2375,10 +2351,7 @@ function poblarFiltrosCuentas() {
     supervisores.forEach(s => selS.innerHTML += `<option ${s===prevS?'selected':''}>${s}</option>`);
   }
 
-  if (selE) {
-    selE.innerHTML = '<option value="">Todos</option>';
-    ejecutivosLista.forEach(e => selE.innerHTML += `<option ${e===prevE?'selected':''}>${e}</option>`);
-  }
+
 
   const selProy2 = document.getElementById('cuentas-fil-proyecto');
   if (selProy2) {
@@ -2405,7 +2378,7 @@ function cuentasFiltrarCliente() {
 }
 
 function limpiarFiltrosCuentas() {
-  ['cuentas-fil-quincena','cuentas-fil-cliente','cuentas-fil-proyecto','cuentas-fil-supervisor','cuentas-fil-ejecutivo']
+  ['cuentas-fil-quincena','cuentas-fil-cliente','cuentas-fil-proyecto','cuentas-fil-supervisor']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   renderTablaCuentas(cuentasFiltroActivo);
 }
@@ -2419,7 +2392,6 @@ function renderTablaCuentas(filtro) {
   const filC = document.getElementById('cuentas-fil-cliente')?.value    || '';
   const filP = document.getElementById('cuentas-fil-proyecto')?.value   || '';
   const filS = document.getElementById('cuentas-fil-supervisor')?.value || '';
-  const filE = document.getElementById('cuentas-fil-ejecutivo')?.value  || '';
 
   poblarFiltrosCuentas();
 
@@ -2428,18 +2400,16 @@ function renderTablaCuentas(filtro) {
   if (filC) document.getElementById('cuentas-fil-cliente').value   = filC;
   if (filP) document.getElementById('cuentas-fil-proyecto').value  = filP;
   if (filS) document.getElementById('cuentas-fil-supervisor').value = filS;
-  if (filE) { const el = document.getElementById('cuentas-fil-ejecutivo'); if (el) el.value = filE; }
 
   const tbody = document.getElementById('tbody-cuentas');
 
   let lista = registros.filter(r => {
     // Supervisores solo ven sus propios registros — siempre
-    if (currentUser && currentUser.role === 'supervisor' && r.supervisor !== currentUser.supervisor) return false;
+    if (currentUser && currentUser.role === 'supervisor' && !esMismoSupervisor(r.supervisor, currentUser.supervisor)) return false;
     if (filQ && r.quincena   !== filQ) return false;
     if (filC && r.cliente    !== filC) return false;
     if (filP && r.proyecto   !== filP) return false;
-    if (filS && r.supervisor !== filS) return false;
-    if (filE && r.aprobadoPor !== filE) return false;
+    if (filS && !esMismoSupervisor(r.supervisor, filS)) return false;
     if (filtro === 'revision')  return (r.estado||'').toUpperCase().includes('REVISI') && (r.estado||'').toUpperCase().includes('CUENTA');
     if (filtro === 'observado') return (r.estado||'').toUpperCase().includes('OBSERVADO') && (r.estado||'').toUpperCase().includes('CUENTA');
     if (filtro === 'aprobado')  return (r.estado||'').toUpperCase().includes('APROBADO') && (r.estado||'').toUpperCase().includes('CUENTA');
@@ -2482,7 +2452,7 @@ function renderTablaCuentas(filtro) {
   const tot = lista.reduce((s,r)=>s+parsearTotal(r.total),0);
   document.getElementById('stat-total').textContent = 'S/. ' + tot.toLocaleString('es-PE',{minimumFractionDigits:0});
 
-  // Ocultar botones Aprobar/Observar y checkboxes para supervisores
+  // Ocultar Aprobar/Observar/checkbox para supervisores
   if (currentUser && currentUser.role === 'supervisor') {
     document.querySelectorAll('#tbody-cuentas .act-approve, #tbody-cuentas .act-observe').forEach(function(btn) {
       var t = btn.textContent.trim();
@@ -2630,7 +2600,7 @@ function renderTablaContabilidad() {
     if (filQ && r.quincena   !== filQ) return false;
     if (filC && r.cliente    !== filC) return false;
     if (filP && r.proyecto   !== filP) return false;
-    if (filS && r.supervisor !== filS) return false;
+    if (filS && !esMismoSupervisor(r.supervisor, filS)) return false;
     return true;
   });
 
@@ -2896,7 +2866,7 @@ function renderTablaRxH() {
   // MÁS los observados por contabilidad que el supervisor debe corregir
   const lista = registros.filter(r => {
     if (!['APROBADO CUENTAS', 'RXH SOLICITADO', 'OBSERVADO-CONTABILIDAD'].includes(r.estado)) return false;
-    if (currentUser?.role === 'supervisor' && r.supervisor !== currentUser.supervisor) return false;
+    if (currentUser && currentUser.role === 'supervisor' && !esMismoSupervisor(r.supervisor, currentUser.supervisor)) return false;
     return true;
   });
 
@@ -3192,6 +3162,16 @@ function exportarExcel() {
 let currentUser = null; // { name, email, role: 'admin'|'supervisor', supervisor: '...' }
 
 // Supervisores conocidos — email → nombre en el Sheet
+// Normaliza nombres para comparación robusta (sin tildes, mayúsculas, sin espacios extra)
+function normalizarNombre(s) {
+  if (!s) return '';
+  return String(s).trim().toUpperCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+function esMismoSupervisor(a, b) {
+  return normalizarNombre(a) === normalizarNombre(b);
+}
+
 const SUPERVISORES_MAP = {
   'jmarinos@ttaudit.com':     'JOSÉ MARIÑOS',
   'operaciones@ttaudit.com':  'ROXANA HIDALGO',
@@ -3682,6 +3662,16 @@ async function procesarExcelCarga(file) {
     if (!proyecto) problemas.push('Sin proyecto');
     if (!String(dni).trim()) problemas.push('Sin DNI');
     if (diasN <= 0) problemas.push('Días = 0');
+
+    // Validar supervisor contra lista de PROYECTOS
+    const supervisoresValidos = window._proyectosRaw
+      ? [...new Set(window._proyectosRaw.map(p => (p.supervisor||'').trim().toUpperCase()).filter(Boolean))]
+      : [];
+    const supNorm = String(supervisor||'').trim().toUpperCase();
+    if (supervisoresValidos.length > 0 && supNorm && !supervisoresValidos.includes(supNorm)) {
+      problemas.push('Supervisor inválido: ' + supervisor);
+    }
+    if (!supNorm) problemas.push('Sin supervisor');
 
     const esDup = esDuplicado(String(dni).trim(), proyecto, quincena);
     if (esDup) problemas.push('⚠️ Duplicado');
