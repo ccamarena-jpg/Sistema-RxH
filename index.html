@@ -2036,7 +2036,7 @@ function filterSupervisores() {
   const proyecto = document.getElementById('f-proyecto').value;
   const selSup   = document.getElementById('f-supervisor');
   selSup.innerHTML = '<option value="">Seleccionar supervisor...</option>';
-  const sups = (window._proyectosData?.[cliente]?.[proyecto]) || [];
+  const sups = ((window._proyectosData && window._proyectosData[cliente] && window._proyectosData[cliente][proyecto])) || [];
   sups.forEach(s => { selSup.innerHTML += `<option>${s}</option>`; });
   if (sups.length === 1) selSup.value = sups[0]; // autoselect si hay solo uno
 }
@@ -2221,32 +2221,6 @@ async function cargarRegistrosDesdeSheets() {
     const data = await fetchScript({accion: 'registros'});
     if (data.registros) {
       registros = data.registros.map(r => ({...r, id: r.fila}));
-
-      // Auto-corregir nombre del supervisor buscando el nombre real en el Sheet
-      if (currentUser && currentUser.role === 'supervisor' && currentUser.supervisor) {
-        var supNorm = normalizarNombre(currentUser.supervisor);
-        var encontrado = null;
-        for (var ri = 0; ri < registros.length; ri++) {
-          if (normalizarNombre(registros[ri].supervisor) === supNorm) {
-            encontrado = registros[ri].supervisor;
-            break;
-          }
-        }
-        if (!encontrado) {
-          // Buscar por primer apellido
-          var primerApellido = supNorm.split(' ')[0];
-          for (var ri = 0; ri < registros.length; ri++) {
-            if (normalizarNombre(registros[ri].supervisor).indexOf(primerApellido) !== -1) {
-              encontrado = registros[ri].supervisor;
-              break;
-            }
-          }
-        }
-        if (encontrado && encontrado !== currentUser.supervisor) {
-          console.log('[Fix supervisor]', currentUser.supervisor, '->', encontrado);
-          currentUser.supervisor = encontrado;
-        }
-      }
       // Debug: mostrar en consola los primeros registros con RxH para verificar
       const conRxh = registros.filter(r => r.numRxh);
       if (conRxh.length) {
@@ -2303,10 +2277,10 @@ async function aprobarSeleccionados(panel) {
 }
 
 function exportarTablaContabilidad() {
-  const filQ = document.getElementById('cont-fil-quincena')?.value || '';
-  const filC = document.getElementById('cont-fil-cliente')?.value  || '';
-  const filP = document.getElementById('cont-fil-proyecto')?.value || '';
-  const filS = document.getElementById('cont-fil-supervisor')?.value || '';
+  const filQ = (document.getElementById('cont-fil-quincena') ? document.getElementById('cont-fil-quincena').value : '') || '';
+  const filC = (document.getElementById('cont-fil-cliente') ? document.getElementById('cont-fil-cliente').value : '')  || '';
+  const filP = (document.getElementById('cont-fil-proyecto') ? document.getElementById('cont-fil-proyecto').value : '') || '';
+  const filS = (document.getElementById('cont-fil-supervisor') ? document.getElementById('cont-fil-supervisor').value : '') || '';
 
   const lista = registros.filter(r => {
     if (!['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado)) return false;
@@ -2392,7 +2366,7 @@ function poblarFiltrosCuentas() {
 
 function cuentasFiltrarCliente() {
   // Solo actualiza proyectos y dispara render — sin loop
-  const cliente  = document.getElementById('cuentas-fil-cliente')?.value || '';
+  const cliente  = (document.getElementById('cuentas-fil-cliente') ? document.getElementById('cuentas-fil-cliente').value : '') || '';
   const selProy  = document.getElementById('cuentas-fil-proyecto');
   if (!selProy) return;
   const proyectos = [...new Set(
@@ -2414,10 +2388,10 @@ function renderTablaCuentas(filtro) {
   else filtro = cuentasFiltroActivo;
 
   // Leer valores ANTES de poblar para no perderlos
-  const filQ = document.getElementById('cuentas-fil-quincena')?.value   || '';
-  const filC = document.getElementById('cuentas-fil-cliente')?.value    || '';
-  const filP = document.getElementById('cuentas-fil-proyecto')?.value   || '';
-  const filS = document.getElementById('cuentas-fil-supervisor')?.value || '';
+  const filQ = (document.getElementById('cuentas-fil-quincena') ? document.getElementById('cuentas-fil-quincena').value : '')   || '';
+  const filC = (document.getElementById('cuentas-fil-cliente') ? document.getElementById('cuentas-fil-cliente').value : '')    || '';
+  const filP = (document.getElementById('cuentas-fil-proyecto') ? document.getElementById('cuentas-fil-proyecto').value : '')   || '';
+  const filS = (document.getElementById('cuentas-fil-supervisor') ? document.getElementById('cuentas-fil-supervisor').value : '') || '';
 
   poblarFiltrosCuentas();
 
@@ -2588,7 +2562,7 @@ function poblarFiltrosCont() {
 }
 
 function contFiltrarCliente() {
-  const cliente = document.getElementById('cont-fil-cliente')?.value || '';
+  const cliente = (document.getElementById('cont-fil-cliente') ? document.getElementById('cont-fil-cliente').value : '') || '';
   const selP    = document.getElementById('cont-fil-proyecto');
   if (!selP) return;
   const base = registros.filter(r => ['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado));
@@ -2606,10 +2580,10 @@ function limpiarFiltrosCont() {
 
 function renderTablaContabilidad() {
   // Leer filtros ANTES de poblar
-  const filQ = document.getElementById('cont-fil-quincena')?.value   || '';
-  const filC = document.getElementById('cont-fil-cliente')?.value    || '';
-  const filP = document.getElementById('cont-fil-proyecto')?.value   || '';
-  const filS = document.getElementById('cont-fil-supervisor')?.value || '';
+  const filQ = (document.getElementById('cont-fil-quincena') ? document.getElementById('cont-fil-quincena').value : '')   || '';
+  const filC = (document.getElementById('cont-fil-cliente') ? document.getElementById('cont-fil-cliente').value : '')    || '';
+  const filP = (document.getElementById('cont-fil-proyecto') ? document.getElementById('cont-fil-proyecto').value : '')   || '';
+  const filS = (document.getElementById('cont-fil-supervisor') ? document.getElementById('cont-fil-supervisor').value : '') || '';
 
   poblarFiltrosCont();
 
@@ -3199,7 +3173,7 @@ function esMismoSupervisor(a, b) {
 }
 
 const SUPERVISORES_MAP = {
-  'jmarinos@ttaudit.com':     'JOSE LUIS MARIÑOS',
+  'jmarinos@ttaudit.com':     'JOSÉ MARIÑOS',
   'operaciones@ttaudit.com':  'ROXANA HIDALGO',
   'ghidalgo@ttaudit.com':     'ROXANA HIDALGO',
 };
@@ -3294,7 +3268,7 @@ function cerrarSesion() {
 
 // Inyectar logo en login screen una vez que cargue
 window.addEventListener('DOMContentLoaded', () => {
-  const logoSrc = document.querySelector('.topbar-logo img')?.src || '';
+  const logoSrc = (document.querySelector('.topbar-logo img') ? document.querySelector('.topbar-logo img').src : '') || '';
   const loginLogo = document.getElementById('login-logo');
   if (loginLogo && logoSrc) loginLogo.src = logoSrc;
 });
@@ -3352,9 +3326,9 @@ function poblarQuincenasDB() {
 }
 
 function getDatosFiltrados() {
-  const filC = document.getElementById('db-fil-cliente')?.value  || '';
-  const filP = document.getElementById('db-fil-proyecto')?.value || '';
-  const filB = document.getElementById('db-fil-banco')?.value    || '';
+  const filC = (document.getElementById('db-fil-cliente') ? document.getElementById('db-fil-cliente').value : '')  || '';
+  const filP = (document.getElementById('db-fil-proyecto') ? document.getElementById('db-fil-proyecto').value : '') || '';
+  const filB = (document.getElementById('db-fil-banco') ? document.getElementById('db-fil-banco').value : '')    || '';
   const todasQ = dbQuincenasSeleccionadas.length === 0;
   return registros.filter(r => {
     if (!todasQ && !dbQuincenasSeleccionadas.includes(r.quincena)) return false;
@@ -3374,9 +3348,9 @@ function limpiarFiltrosDB() {
 }
 
 function poblarFiltrosDB() {
-  const prevC = document.getElementById('db-fil-cliente')?.value  || '';
-  const prevP = document.getElementById('db-fil-proyecto')?.value || '';
-  const prevB = document.getElementById('db-fil-banco')?.value    || '';
+  const prevC = (document.getElementById('db-fil-cliente') ? document.getElementById('db-fil-cliente').value : '')  || '';
+  const prevP = (document.getElementById('db-fil-proyecto') ? document.getElementById('db-fil-proyecto').value : '') || '';
+  const prevB = (document.getElementById('db-fil-banco') ? document.getElementById('db-fil-banco').value : '')    || '';
   const clientes  = [...new Set(registros.map(r=>r.cliente).filter(Boolean))].sort();
   const proyectos = [...new Set(registros.map(r=>r.proyecto).filter(Boolean))].sort();
   const bancos    = [...new Set(registros.map(r=>r.banco).filter(Boolean))].sort();
@@ -3604,11 +3578,11 @@ function renderDashboard() {
 
   // Barras horizontales
   const byC = agruparPor(lista, 'cliente');
-  renderBarrasHorizontales('db-chart-cliente', byC, byC[0]?.[1]||1);
+  renderBarrasHorizontales('db-chart-cliente', byC, (byC[0] ? byC[0][1] : 0)||1);
   const byP = agruparPor(lista, 'proyecto').slice(0,8);
-  renderBarrasHorizontales('db-chart-proyecto', byP, byP[0]?.[1]||1);
+  renderBarrasHorizontales('db-chart-proyecto', byP, (byP[0] ? byP[0][1] : 0)||1);
   const byB = agruparPor(lista, 'banco');
-  renderBarrasHorizontales('db-chart-banco', byB, byB[0]?.[1]||1);
+  renderBarrasHorizontales('db-chart-banco', byB, (byB[0] ? byB[0][1] : 0)||1);
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -3881,7 +3855,7 @@ function descargarPlantilla() {
   const headers = ['Quincena','Cliente','Proyecto','Supervisor','DNI',
                    'Días','Pago/día','Mov.diaria','Mov.adicional',
                    'Mov.viajera','Adelanto','Megas','Otros'];
-  const ejemplo = ['Q1-ABR-2026','BAT','SS MERCH','JOSE LUIS MARIÑOS','12345678',
+  const ejemplo = ['Q1-ABR-2026','BAT','SS MERCH','JOSÉ MARIÑOS','12345678',
                    15, 80, 10, 0, 0, 0, 15, 0];
 
   if (typeof XLSX !== 'undefined') {
@@ -4053,9 +4027,9 @@ async function notificarPorEmail(tipo, registro, destinatario) {
 // ── Exportar pagos banco desde Contabilidad (pre-filtra con filtros activos) ──
 function abrirExportarDesdeCont() {
   // Tomar los filtros activos de Contabilidad y aplicarlos al panel exportar
-  const q = document.getElementById('cont-fil-quincena')?.value || '';
-  const c = document.getElementById('cont-fil-cliente')?.value  || '';
-  const p = document.getElementById('cont-fil-proyecto')?.value || '';
+  const q = (document.getElementById('cont-fil-quincena') ? document.getElementById('cont-fil-quincena').value : '') || '';
+  const c = (document.getElementById('cont-fil-cliente') ? document.getElementById('cont-fil-cliente').value : '')  || '';
+  const p = (document.getElementById('cont-fil-proyecto') ? document.getElementById('cont-fil-proyecto').value : '') || '';
 
   // Navegar al panel exportar
   document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
@@ -4093,10 +4067,10 @@ function abrirCargaMasiva() {
 
 // ── Exportar datos de Cuentas (todos los visibles según filtros activos) ──
 function exportarDatosCuentas() {
-  const quincena   = document.getElementById('cuentas-fil-quincena')?.value  || '';
-  const cliente    = document.getElementById('cuentas-fil-cliente')?.value   || '';
-  const proyecto   = document.getElementById('cuentas-fil-proyecto')?.value  || '';
-  const supervisor = document.getElementById('cuentas-fil-supervisor')?.value|| '';
+  const quincena   = (document.getElementById('cuentas-fil-quincena') ? document.getElementById('cuentas-fil-quincena').value : '')  || '';
+  const cliente    = (document.getElementById('cuentas-fil-cliente') ? document.getElementById('cuentas-fil-cliente').value : '')   || '';
+  const proyecto   = (document.getElementById('cuentas-fil-proyecto') ? document.getElementById('cuentas-fil-proyecto').value : '')  || '';
+  const supervisor = (document.getElementById('cuentas-fil-supervisor') ? document.getElementById('cuentas-fil-supervisor').value : '')|| '';
 
   let lista = registros.filter(r => {
     const qOk = !quincena   || r.quincena   === quincena;
