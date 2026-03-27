@@ -1841,18 +1841,19 @@ function fetchScript(params) {
     // ── JSONP path ──
     const script = document.createElement('script');
     script.src = url;
+    // Registrar callback ANTES de insertar el script en el DOM
     window[cbName] = (data) => {
       delete window[cbName];
-      try { document.body.removeChild(script); } catch(e) {}
+      try { (document.head || document.body).removeChild(script); } catch(e) {}
       settle(resolve, data);
     };
     script.onerror = () => {
       delete window[cbName];
-      try { document.body.removeChild(script); } catch(e) {}
+      try { (document.head || document.body).removeChild(script); } catch(e) {}
       // Fallback: fetch sin callback
       fetchScriptFallback(params).then(d => settle(resolve, d)).catch(e => settle(reject, e));
     };
-    document.body.appendChild(script);
+    (document.head || document.body).appendChild(script);
 
     // Timeout 8s → fallback fetch
     setTimeout(() => {
