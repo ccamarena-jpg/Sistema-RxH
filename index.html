@@ -2784,31 +2784,53 @@ function confirmarObservacion() {
 
 function verDetalle(id) {
   const r = registros.find(x=>x.id===id);
+  if (!r) return;
+
+  // Formateador robusto de montos
+  function fmtS(v) {
+    const n = parseFloat(String(v||'').replace(/[^0-9.-]/g,''));
+    return (!isNaN(n) && n > 0) ? 'S/. ' + n.toFixed(2) : null;
+  }
+  function fmt(v) { return (v !== undefined && v !== null && v !== '') ? v : null; }
+
+  // Calcular pago por días y movilidad total
+  const dias      = parseFloat(r.dias) || 0;
+  const pagoDia   = parseFloat(r.pagoDia) || 0;
+  const movDia    = parseFloat(r.movilidadDia) || 0;
+  const pagoDias  = dias * pagoDia;
+  const movTotal  = dias * movDia;
+
+  // Construir filas — solo mostrar si tienen valor
+  const filas = [
+    ['Quincena',          fmt(r.quincena)],
+    ['Cliente',           fmt(r.cliente)],
+    ['Proyecto',          fmt(r.proyecto)],
+    ['Supervisor',        fmt(r.supervisor)],
+    ['Ciudad',            fmt(r.ciudad)],
+    ['DNI',               fmt(r.dni)],
+    ['Días trabajados',   dias > 0 ? dias : null],
+    ['Pago por día',      fmtS(pagoDia)],
+    ['Total honorarios',  fmtS(pagoDias || r.pagoDias)],
+    ['Movilidad por día', fmtS(movDia)],
+    ['Movilidad total',   fmtS(movTotal || r.movilidad)],
+    ['Mov. adicional',    fmtS(r.movAdicional)],
+    ['Mov. viajera',      fmtS(r.movViajera)],
+    ['Megas',             fmtS(r.megas)],
+    ['Otros conceptos',   fmtS(r.otros)],
+    ['Adelanto',          fmtS(r.adelanto)],
+    ['<strong>Total a pagar</strong>', fmtS(r.total) ? '<strong>' + fmtS(r.total) + '</strong>' : null],
+    ['RxH',               fmt(r.rxh)],
+    ['N° RxH',            fmt(r.numRxh)],
+    ['Estado',            fmt(r.estado)],
+  ].filter(([k, v]) => v !== null);
+
   document.getElementById('modal-det-title').textContent = r.nombre;
   document.getElementById('modal-det-content').innerHTML = `
     <table style="width:100%;border-collapse:collapse">
-      ${[
-        ['Quincena', r.quincena || 'Q1-FEB-2026'],
-        ['Cliente', r.cliente],
-        ['Proyecto', r.proyecto],
-        ['Ciudad', r.ciudad],
-        ['DNI', r.dni],
-        ['Banco', r.banco],
-        ['N° Cuenta', r.cuenta],
-        ['N° CCI', r.cci],
-        ['Días', r.dias],
-        ['Honorarios', 'S/. ' + r.honorarios],
-        ['Movilidad base', 'S/. ' + r.movilidad],
-        ['Mov. adicional', 'S/. ' + (r.movAdicional||0)],
-        ['Megas', 'S/. ' + (r.megas||0)],
-        ['Total', 'S/. ' + r.total],
-        ['RxH', r.rxh],
-        ['N° RxH', r.numRxh || '—'],
-        ['Estado', r.estado],
-      ].map(([k,v]) => `
-        <tr>
-          <td style="padding:6px 0;color:var(--text-dim);width:45%;font-size:12px">${k}</td>
-          <td style="padding:6px 0;font-size:13px">${v}</td>
+      ${filas.map(([k,v]) => `
+        <tr style="border-bottom:1px solid #f0f0f0">
+          <td style="padding:7px 0;color:var(--text-dim);width:48%;font-size:12px">${k}</td>
+          <td style="padding:7px 0;font-size:13px;font-weight:500">${v}</td>
         </tr>
       `).join('')}
     </table>
@@ -3173,7 +3195,7 @@ function esMismoSupervisor(a, b) {
 }
 
 const SUPERVISORES_MAP = {
-  'jmarinos@ttaudit.com':     'JOSE LUIS MARIÑOS',
+  'jmarinos@ttaudit.com':     'JOSÉ MARIÑOS',
   'operaciones@ttaudit.com':  'ROXANA HIDALGO',
   'ghidalgo@ttaudit.com':     'ROXANA HIDALGO',
 };
@@ -3855,7 +3877,7 @@ function descargarPlantilla() {
   const headers = ['Quincena','Cliente','Proyecto','Supervisor','DNI',
                    'Días','Pago/día','Mov.diaria','Mov.adicional',
                    'Mov.viajera','Adelanto','Megas','Otros'];
-  const ejemplo = ['Q1-ABR-2026','BAT','SS MERCH','JOSE LUIS MARIÑOS','12345678',
+  const ejemplo = ['Q1-ABR-2026','BAT','SS MERCH','JOSÉ MARIÑOS','12345678',
                    15, 80, 10, 0, 0, 0, 15, 0];
 
   if (typeof XLSX !== 'undefined') {
