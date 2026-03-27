@@ -1419,6 +1419,23 @@ function doGet(e) {
     return respond({found:false});
   }
 
+  // ── OBTENER BBDD COMPLETA (para carga masiva) ──
+  if (accion === 'bbdd') {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("BBDD");
+    var data  = sheet.getDataRange().getValues();
+    var result = [];
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      if (!row[0] && !row[1]) continue;
+      result.push({
+        nombre: row[0], dni: String(row[1]).replace(/\.0$/,''),
+        ciudad: row[2], departamento: row[3],
+        banco: row[4], cuenta: String(row[5]), cci: String(row[6])
+      });
+    }
+    return respond({ personas: result });
+  }
+
   // ── OBTENER PROYECTOS ──
   if (accion === 'proyectos') {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("PROYECTOS");
@@ -3683,32 +3700,42 @@ async function procesarExcelCarga(file) {
 
 async function enriquecerCargaConBBDD() {
   if (!SCRIPT_URL) return;
-  // Buscar todos los DNIs únicos en paralelo (máx 10 a la vez)
-  const dniUnicos = [...new Set(cargaFilas.map(f => f.dni).filter(Boolean))];
-  for (const dni of dniUnicos) {
-    try {
-      const res = await fetchScript({ accion: 'dni', dni });
-      if (res.found) {
-        cargaFilas.forEach(f => {
-          if (f.dni === dni) {
-            f.nombre       = res.nombre       || '';
-            f.departamento = res.departamento || '';
-            f.ciudad       = res.ciudad       || '';
-            f.banco        = res.banco        || '';
-            f.cuenta       = res.cuenta       || '';
-            f.cci          = res.cci          || '';
-          }
-        });
-      } else {
-        cargaFilas.forEach(f => {
-          if (f.dni === dni && f.valido) {
-            f.problemas.push('DNI no en BBDD');
-            f.valido = false;
-          }
-        });
+
+  // Una sola llamada trae toda la BBDD — evita throttling con 100+ DNIs
+  let bbddMap = {};
+  try {
+    const res = await fetchScript({ accion: 'bbdd' });
+    if (res.personas) {
+      res.personas.forEach(p => {
+        bbddMap[String(p.dni).trim()] = p;
+      });
+    }
+  } catch (e) {
+    // Si falla la llamada, marcar todas como error de conexión
+    cargaFilas.forEach(f => {
+      if (f.valido) {
+        f.problemas.push('Error al consultar BBDD');
+        f.valido = false;
       }
-    } catch (e) { /* continuar */ }
+    });
+    return;
   }
+
+  // Ahora validar cada fila contra el mapa local
+  cargaFilas.forEach(f => {
+    const persona = bbddMap[String(f.dni).trim()];
+    if (persona) {
+      f.nombre       = persona.nombre       || '';
+      f.departamento = persona.departamento || '';
+      f.ciudad       = persona.ciudad       || '';
+      f.banco        = persona.banco        || '';
+      f.cuenta       = persona.cuenta       || '';
+      f.cci          = persona.cci          || '';
+    } else if (f.valido) {
+      f.problemas.push('DNI no en BBDD');
+      f.valido = false;
+    }
+  });
 }
 
 function renderPreviewCarga() {
