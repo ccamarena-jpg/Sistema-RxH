@@ -710,6 +710,10 @@
           <option value="">Cargando...</option>
         </select>
       </div>
+      <div class="field">
+        <label>Ejecutivo de Cuentas</label>
+        <input type="text" id="f-ej-cuentas" readonly placeholder="Se autocompleta al elegir proyecto" style="background:#f8f8f8;color:var(--text-muted)">
+      </div>
     </div>
   </div>
 
@@ -873,6 +877,12 @@
     <div class="field" style="margin:0;min-width:140px">
       <label style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Supervisor</label>
       <select id="cuentas-fil-supervisor" onchange="renderTablaCuentas(cuentasFiltroActivo)" style="width:100%;padding:7px 12px;border-radius:6px;border:1px solid var(--border);font-size:13px;background:#fff;color:var(--text)">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div class="field" style="margin:0;min-width:160px">
+      <label style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Ejecutivo Cuentas</label>
+      <select id="cuentas-fil-ejcuentas" onchange="renderTablaCuentas(cuentasFiltroActivo)" style="width:100%;padding:7px 12px;border-radius:6px;border:1px solid var(--border);font-size:13px;background:#fff;color:var(--text)">
         <option value="">Todos</option>
       </select>
     </div>
@@ -1342,8 +1352,9 @@
     data.quincena,         // B: QUINCENA
     data.cliente,          // C: CLIENTE
     data.proyecto,         // D: PROYECTO
-    data.supervisor,       // E: SUPERVISOR ← nuevo
-    data.nombre,           // F: APELLIDOS Y NOMBRE
+    data.supervisor,       // E: SUPERVISOR
+    data.ejCuentas,        // F: EJECUTIVO DE CUENTAS ← nuevo
+    data.nombre,           // G: APELLIDOS Y NOMBRE
     data.dni,              // G: DNI
     data.departamento,     // H: DEPARTAMENTO
     data.ciudad,           // I: CIUDAD
@@ -1433,19 +1444,32 @@ function doGet(e) {
 
   // ── OBTENER PROYECTOS ──
   if (accion === 'proyectos') {
-    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("PROYECTOS");
-    var rows  = sheet.getDataRange().getValues();
+    var sheet  = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("PROYECTOS");
+    var rows   = sheet.getDataRange().getValues();
+    var hdrs   = rows[0];
+    var idxP   = {};
+    for (var h = 0; h < hdrs.length; h++) {
+      idxP[String(hdrs[h]).trim().toUpperCase()] = h;
+    }
+    function colP(row, nombre) {
+      var i = idxP[String(nombre).trim().toUpperCase()];
+      return (i !== undefined && row[i] !== undefined && row[i] !== null && row[i] !== '') ? String(row[i]) : '';
+    }
     var result = [];
     for (var i = 1; i < rows.length; i++) {
       var row = rows[i];
-      if (!row[0] && !row[1]) continue; // saltar filas vacías
+      if (!row[1] && !row[2]) continue; // saltar filas vacías (cliente y proyecto vacíos)
+      var fi = colP(row, 'FECHA INICIO') || colP(row, 'FECHA DE INICIO') || '';
+      var fechaStr = '';
+      if (fi) { try { fechaStr = new Date(fi).toLocaleDateString('es-PE'); } catch(err) { fechaStr = fi; } }
       result.push({
-        gerente:    row[0],
-        cliente:    row[1],
-        proyecto:   row[2],
-        supervisor: row[3],
-        fechaInicio: row[4] ? new Date(row[4]).toLocaleDateString('es-PE') : '',
-        status:     row[5] || 'ACTIVO'
+        gerente:     colP(row, 'GERENTE'),
+        cliente:     colP(row, 'CLIENTE'),
+        proyecto:    colP(row, 'PROYECTO'),
+        supervisor:  colP(row, 'SUPERVISOR'),
+        ejCuentas:   colP(row, 'EJECUTIVO DE CUENTAS') || colP(row, 'EJ. CUENTAS') || colP(row, 'EJECUTIVO CUENTAS') || '',
+        fechaInicio: fechaStr,
+        status:      colP(row, 'STATUS') || colP(row, 'ESTADO') || 'ACTIVO'
       });
     }
     return respond({proyectos: result});
@@ -1479,6 +1503,7 @@ function doGet(e) {
         cliente:         col(row, 'CLIENTE'),
         proyecto:        col(row, 'PROYECTO'),
         supervisor:      col(row, 'SUPERVISOR'),
+        ejCuentas:       col(row, 'EJECUTIVO DE CUENTAS') || col(row, 'EJ. CUENTAS') || col(row, 'EJECUTIVO CUENTAS') || '',
         nombre:          col(row, 'APELLIDOS Y NOMBRE'),
         dni:             String(col(row, 'DNI')),
         departamento:    col(row, 'DEPARTAMENTO'),
@@ -1537,10 +1562,10 @@ function doGet(e) {
     var obs   = e.parameter.obs || '';
     var quien = e.parameter.quien || '';
     if (tipo === 'cuentas') {
-      sheet.getRange(fila, 29).setValue(nuevoEstado);    // AC: estado
-      sheet.getRange(fila, 30).setValue(obs);            // AD: obs cuentas
-      sheet.getRange(fila, 31).setValue(new Date());     // AE: fecha aprobacion
-      sheet.getRange(fila, 32).setValue(quien);          // AF: aprobado por
+      sheet.getRange(fila, 30).setValue(nuevoEstado);    // AD: estado
+      sheet.getRange(fila, 31).setValue(obs);            // AE: obs cuentas
+      sheet.getRange(fila, 32).setValue(new Date());     // AF: fecha aprobacion
+      sheet.getRange(fila, 33).setValue(quien);          // AG: aprobado por
     } else if (tipo === 'correccion-monto') {
       // Supervisor corrige los conceptos tras observación de Cuentas
       var dias      = parseFloat(e.parameter.dias)      || 0;
@@ -1565,19 +1590,19 @@ function doGet(e) {
       sheet.getRange(fila, 21).setValue(otros);          // U: OTROS CONCEPTOS
       sheet.getRange(fila, 22).setValue(adelanto);       // V: ADELANTO MOV VIAJERA
       sheet.getRange(fila, 23).setValue(total);          // W: TOTAL A PAGAR
-      sheet.getRange(fila, 29).setValue(nuevoEstado);    // AC: ESTADO
-      sheet.getRange(fila, 30).setValue('');             // AD: limpiar obs cuentas
+      sheet.getRange(fila, 30).setValue(nuevoEstado);    // AD: ESTADO
+      sheet.getRange(fila, 31).setValue('');             // AE: limpiar obs cuentas
     } else if (tipo === 'rxh') {
       // X=emitió(24) Z=#recibo(26) AA=detalle(27) AC=estado(29)
-      sheet.getRange(fila, 24).setValue('Sí');                      // X: Emitió RxH
-      sheet.getRange(fila, 26).setValue(e.parameter.numRxh || '');  // Z: # Recibo (legible)
-      sheet.getRange(fila, 27).setValue(e.parameter.rxh || '');     // AA: Detalle completo
-      sheet.getRange(fila, 29).setValue(nuevoEstado);               // AC: Estado
+      sheet.getRange(fila, 25).setValue('Sí');                      // Y: Emitió RxH
+      sheet.getRange(fila, 27).setValue(e.parameter.numRxh || '');  // AA: # Recibo (legible)
+      sheet.getRange(fila, 28).setValue(e.parameter.rxh || '');     // AB: Detalle completo
+      sheet.getRange(fila, 30).setValue(nuevoEstado);               // AD: Estado
     } else {
-      sheet.getRange(fila, 29).setValue(nuevoEstado);               // AC: estado
-      sheet.getRange(fila, 33).setValue(obs);                       // AG: obs contabilidad
-      sheet.getRange(fila, 34).setValue(new Date());                // AH: fecha aprobacion cont
-      sheet.getRange(fila, 35).setValue('Si');                      // AI: aprobado cont
+      sheet.getRange(fila, 30).setValue(nuevoEstado);               // AD: estado
+      sheet.getRange(fila, 34).setValue(obs);                       // AH: obs contabilidad
+      sheet.getRange(fila, 35).setValue(new Date());                // AI: fecha aprobacion cont
+      sheet.getRange(fila, 36).setValue('Si');                      // AJ: aprobado cont
     }
     return respond({status:'ok'});
   }
@@ -1877,7 +1902,7 @@ function fetchScriptFallback(params) {
 }
 
 // ── CONFIG ──
-let SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwAyDDEM-9xZKg-h5nsH7BdaJcBEBmpeAp5fzOWGWBhwxahUPxWo3_42Fcir7vpHZuV/exec';
+let SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx-snmRo_BKRiszoyGM6vMI_AtEgsh_rhYvIMSor0cNUQUBUhRRPhf_EJN9cDOY2g1E/exec';
 // También guardar en localStorage por compatibilidad
 localStorage.setItem('rxh_script_url', SCRIPT_URL);
 
@@ -2039,6 +2064,16 @@ function filterSupervisores() {
   const sups = ((window._proyectosData && window._proyectosData[cliente] && window._proyectosData[cliente][proyecto])) || [];
   sups.forEach(s => { selSup.innerHTML += `<option>${s}</option>`; });
   if (sups.length === 1) selSup.value = sups[0]; // autoselect si hay solo uno
+
+  // Autocompletar Ejecutivo de Cuentas según cliente+proyecto
+  const ejInput = document.getElementById('f-ej-cuentas');
+  if (ejInput && window._proyectosRaw) {
+    const match = window._proyectosRaw.find(p =>
+      (p.cliente||'').toUpperCase() === cliente.toUpperCase() &&
+      (p.proyecto||'').toUpperCase() === proyecto.toUpperCase()
+    );
+    ejInput.value = match ? (match.ejCuentas || '') : '';
+  }
 }
 
 // ── BUSCAR DNI ──
@@ -2144,6 +2179,7 @@ async function guardarRegistro() {
     cliente:       document.getElementById('f-cliente').value,
     proyecto:      document.getElementById('f-proyecto').value,
     supervisor:    document.getElementById('f-supervisor').value,
+    ejCuentas:     document.getElementById('f-ej-cuentas').value,
     nombre:        document.getElementById('f-nombre').value,
     dni:           document.getElementById('f-dni').value,
     departamento:  document.getElementById('f-departamento').value,
@@ -2284,10 +2320,11 @@ function exportarTablaContabilidad() {
 
   const lista = registros.filter(r => {
     if (!['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado)) return false;
-    if (filQ && r.quincena   !== filQ) return false;
-    if (filC && r.cliente    !== filC) return false;
-    if (filP && r.proyecto   !== filP) return false;
-    if (filS && !esMismoSupervisor(r.supervisor, filS)) return false;
+    if (filQ  && r.quincena   !== filQ) return false;
+    if (filC  && r.cliente    !== filC) return false;
+    if (filP  && r.proyecto   !== filP) return false;
+    if (filS  && !esMismoSupervisor(r.supervisor, filS)) return false;
+    if (filEj && (r.ejCuentas||'').toUpperCase() !== filEj.toUpperCase()) return false;
     return true;
   });
 
@@ -2335,6 +2372,7 @@ function poblarFiltrosCuentas() {
   const quincenas    = [...new Set(base.map(r=>r.quincena).filter(Boolean))].sort().reverse();
   const clientes     = [...new Set(base.map(r=>r.cliente).filter(Boolean))].sort();
   const supervisores = [...new Set(registros.map(r=>r.supervisor).filter(Boolean))].sort();
+  const ejsCuentas   = [...new Set(registros.map(r=>r.ejCuentas).filter(Boolean))].sort();
 
 
   selQ.innerHTML = '<option value="">Todas</option>';
@@ -2351,7 +2389,12 @@ function poblarFiltrosCuentas() {
     supervisores.forEach(s => selS.innerHTML += `<option ${s===prevS?'selected':''}>${s}</option>`);
   }
 
-
+  const selEj = document.getElementById('cuentas-fil-ejcuentas');
+  if (selEj) {
+    const prevEj = selEj.value;
+    selEj.innerHTML = '<option value="">Todos</option>';
+    ejsCuentas.forEach(ej => selEj.innerHTML += `<option ${ej===prevEj?'selected':''}>${ej}</option>`);
+  }
 
   const selProy2 = document.getElementById('cuentas-fil-proyecto');
   if (selProy2) {
@@ -2378,7 +2421,7 @@ function cuentasFiltrarCliente() {
 }
 
 function limpiarFiltrosCuentas() {
-  ['cuentas-fil-quincena','cuentas-fil-cliente','cuentas-fil-proyecto','cuentas-fil-supervisor']
+  ['cuentas-fil-quincena','cuentas-fil-cliente','cuentas-fil-proyecto','cuentas-fil-supervisor','cuentas-fil-ejcuentas']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   renderTablaCuentas(cuentasFiltroActivo);
 }
@@ -2388,18 +2431,20 @@ function renderTablaCuentas(filtro) {
   else filtro = cuentasFiltroActivo;
 
   // Leer valores ANTES de poblar para no perderlos
-  const filQ = (document.getElementById('cuentas-fil-quincena') ? document.getElementById('cuentas-fil-quincena').value : '')   || '';
-  const filC = (document.getElementById('cuentas-fil-cliente') ? document.getElementById('cuentas-fil-cliente').value : '')    || '';
-  const filP = (document.getElementById('cuentas-fil-proyecto') ? document.getElementById('cuentas-fil-proyecto').value : '')   || '';
-  const filS = (document.getElementById('cuentas-fil-supervisor') ? document.getElementById('cuentas-fil-supervisor').value : '') || '';
+  const filQ  = (document.getElementById('cuentas-fil-quincena')   ? document.getElementById('cuentas-fil-quincena').value   : '') || '';
+  const filC  = (document.getElementById('cuentas-fil-cliente')    ? document.getElementById('cuentas-fil-cliente').value    : '') || '';
+  const filP  = (document.getElementById('cuentas-fil-proyecto')   ? document.getElementById('cuentas-fil-proyecto').value   : '') || '';
+  const filS  = (document.getElementById('cuentas-fil-supervisor') ? document.getElementById('cuentas-fil-supervisor').value : '') || '';
+  const filEj = (document.getElementById('cuentas-fil-ejcuentas')  ? document.getElementById('cuentas-fil-ejcuentas').value  : '') || '';
 
   poblarFiltrosCuentas();
 
   // Restaurar valores después de poblar
-  if (filQ) document.getElementById('cuentas-fil-quincena').value  = filQ;
-  if (filC) document.getElementById('cuentas-fil-cliente').value   = filC;
-  if (filP) document.getElementById('cuentas-fil-proyecto').value  = filP;
-  if (filS) document.getElementById('cuentas-fil-supervisor').value = filS;
+  if (filQ)  document.getElementById('cuentas-fil-quincena').value   = filQ;
+  if (filC)  document.getElementById('cuentas-fil-cliente').value    = filC;
+  if (filP)  document.getElementById('cuentas-fil-proyecto').value   = filP;
+  if (filS)  document.getElementById('cuentas-fil-supervisor').value = filS;
+  if (filEj) { const el = document.getElementById('cuentas-fil-ejcuentas'); if(el) el.value = filEj; }
 
   const tbody = document.getElementById('tbody-cuentas');
 
@@ -3641,7 +3686,7 @@ async function procesarExcelCarga(file) {
 
   cargaFilas = [];
   for (const row of rows) {
-    const [quincena, cliente, proyecto, supervisor, dni,
+    const [quincena, cliente, proyecto, supervisor, ejCuentas, dni,
            dias, pagoDia, movDia, movAd, movVi, adelanto, megas, otros] = row;
 
     const diasN    = parseFloat(dias)    || 0;
@@ -3678,6 +3723,7 @@ async function procesarExcelCarga(file) {
 
     cargaFilas.push({
       quincena, cliente, proyecto, supervisor,
+      ejCuentas: String(ejCuentas||'').trim(),
       dni: String(dni).trim(), dias: diasN, pagoDia: pagoDiaN,
       pagoDias, movilidadDia: movDiaN, movilidad: movilidad,
       movAdicional: movAdN, movViajera: movViN,
@@ -3804,7 +3850,8 @@ async function confirmarCargaMasiva() {
 
     const payload = {
       quincena: f.quincena, cliente: f.cliente, proyecto: f.proyecto,
-      supervisor: f.supervisor, nombre: f.nombre, dni: f.dni,
+      supervisor: f.supervisor, ejCuentas: f.ejCuentas || '',
+      nombre: f.nombre, dni: f.dni,
       departamento: f.departamento, ciudad: f.ciudad, banco: f.banco,
       cuenta: f.cuenta, cci: f.cci, dias: f.dias, pagoDia: f.pagoDia,
       pagoDias: f.pagoDias, movilidadDia: f.movilidadDia, movilidad: f.movilidad,
@@ -3852,10 +3899,10 @@ function limpiarCarga() {
 }
 
 function descargarPlantilla() {
-  const headers = ['Quincena','Cliente','Proyecto','Supervisor','DNI',
+  const headers = ['Quincena','Cliente','Proyecto','Supervisor','Ej. Cuentas','DNI',
                    'Días','Pago/día','Mov.diaria','Mov.adicional',
                    'Mov.viajera','Adelanto','Megas','Otros'];
-  const ejemplo = ['Q1-ABR-2026','BAT','SS MERCH','JOSÉ MARIÑOS','12345678',
+  const ejemplo = ['Q1-ABR-2026','BAT','SS MERCH','JOSÉ MARIÑOS','PEDRO PÉREZ','12345678',
                    15, 80, 10, 0, 0, 0, 15, 0];
 
   if (typeof XLSX !== 'undefined') {
@@ -4067,7 +4114,8 @@ function abrirCargaMasiva() {
 
 // ── Exportar datos de Cuentas (todos los visibles según filtros activos) ──
 function exportarDatosCuentas() {
-  const quincena   = (document.getElementById('cuentas-fil-quincena') ? document.getElementById('cuentas-fil-quincena').value : '')  || '';
+  const quincena   = (document.getElementById('cuentas-fil-quincena')   ? document.getElementById('cuentas-fil-quincena').value   : '') || '';
+  const filEjExp   = (document.getElementById('cuentas-fil-ejcuentas')  ? document.getElementById('cuentas-fil-ejcuentas').value  : '') || '';
   const cliente    = (document.getElementById('cuentas-fil-cliente') ? document.getElementById('cuentas-fil-cliente').value : '')   || '';
   const proyecto   = (document.getElementById('cuentas-fil-proyecto') ? document.getElementById('cuentas-fil-proyecto').value : '')  || '';
   const supervisor = (document.getElementById('cuentas-fil-supervisor') ? document.getElementById('cuentas-fil-supervisor').value : '')|| '';
