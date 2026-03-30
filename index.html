@@ -4024,7 +4024,7 @@ async function procesarExcelCarga(file) {
 
   cargaFilas = [];
   for (const row of rows) {
-    const [quincena, cliente, proyecto, supervisor, ejCuentas, dni,
+    const [, quincena, cliente, proyecto, supervisor, ejCuentas, dni,
            dias, pagoDia, movDia, movAd, movVi, adelanto, megas, otros] = row;
 
     const diasN    = parseFloat(dias)    || 0;
