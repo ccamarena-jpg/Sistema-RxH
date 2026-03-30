@@ -2429,19 +2429,17 @@ async function aprobarSeleccionados(panel) {
 }
 
 function exportarTablaContabilidad() {
-  const filQ = (document.getElementById('cont-fil-quincena') ? document.getElementById('cont-fil-quincena').value : '') || '';
-  const filC = (document.getElementById('cont-fil-cliente') ? document.getElementById('cont-fil-cliente').value : '')  || '';
-  const filP = (document.getElementById('cont-fil-proyecto') ? document.getElementById('cont-fil-proyecto').value : '') || '';
-  const filS = (document.getElementById('cont-fil-supervisor') ? document.getElementById('cont-fil-supervisor').value : '') || '';
+  const filQ     = (document.getElementById('cont-fil-quincena')   ? document.getElementById('cont-fil-quincena').value   : '') || '';
+  const filC     = (document.getElementById('cont-fil-cliente')    ? document.getElementById('cont-fil-cliente').value    : '') || '';
+  const filP     = (document.getElementById('cont-fil-proyecto')   ? document.getElementById('cont-fil-proyecto').value   : '') || '';
+  const filS     = (document.getElementById('cont-fil-supervisor') ? document.getElementById('cont-fil-supervisor').value : '') || '';
 
   const lista = registros.filter(r => {
     if (!['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado)) return false;
-    if (filQ  && r.quincena   !== filQ) return false;
-    if (filC  && r.cliente    !== filC) return false;
-    if (filP  && r.proyecto   !== filP) return false;
-    if (filS  && !esMismoSupervisor(r.supervisor, filS)) return false;
-    if (filEj    && (r.ejCuentas||'').toUpperCase() !== filEj.toUpperCase()) return false;
-    if (filAprob && (r.aprobadoPor||'').toUpperCase() !== filAprob.toUpperCase()) return false;
+    if (filQ && r.quincena  !== filQ) return false;
+    if (filC && r.cliente   !== filC) return false;
+    if (filP && r.proyecto  !== filP) return false;
+    if (filS && !esMismoSupervisor(r.supervisor, filS)) return false;
     return true;
   });
 
@@ -3442,9 +3440,9 @@ function previsualizarReporte() {
       <td style="color:var(--text-dim)">${i+1}</td>
       <td><strong>${r.nombre}</strong></td>
       <td style="font-family:monospace">${r.dni}</td>
-      <td>9</td>
-      <td>${(r.banco||'').toUpperCase().includes('INTERBANK') || (r.banco||'').toUpperCase().includes('IBK') ? '9' : '99'}</td>
-      <td>01</td>
+      <td>${((r.banco||'').toUpperCase().includes('INTERBANK') || (r.banco||'').toUpperCase().includes('IBK')) ? '9' : '99'}</td>
+      <td>${((r.banco||'').toUpperCase().includes('INTERBANK') || (r.banco||'').toUpperCase().includes('IBK')) ? '002' : '00'}</td>
+      <td>${((r.banco||'').toUpperCase().includes('INTERBANK') || (r.banco||'').toUpperCase().includes('IBK')) ? '01' : '00'}</td>
       <td style="font-family:monospace">${cuentaLimpia || '<span style="color:var(--orange)">—</span>'}</td>
       <td style="font-family:monospace">${cciLimpia    || '<span style="color:var(--orange)">—</span>'}</td>
       <td>01</td>
@@ -3481,9 +3479,9 @@ function exportarExcel() {
       i+1,
       r.nombre,
       r.dni,
-      '9',
-      (r.banco||'').toUpperCase().includes('INTERBANK') || (r.banco||'').toUpperCase().includes('IBK') ? '9' : '99',
-      '01',
+      ((r.banco||'').toUpperCase().includes('INTERBANK') || (r.banco||'').toUpperCase().includes('IBK')) ? '9' : '99',
+      ((r.banco||'').toUpperCase().includes('INTERBANK') || (r.banco||'').toUpperCase().includes('IBK')) ? '002' : '00',
+      ((r.banco||'').toUpperCase().includes('INTERBANK') || (r.banco||'').toUpperCase().includes('IBK')) ? '01' : '00',
       cuentaLimpia,
       cciLimpia,
       '01',
