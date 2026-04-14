@@ -3433,9 +3433,24 @@ function copiarCodigo() {
 // ── TOAST ──
 function showToast(msg, error=false) {
   const t = document.getElementById('toast');
+  if (!t) return;
   t.textContent = msg;
-  t.className = 'toast show' + (error ? ' error' : '');
-  setTimeout(() => t.className = 'toast', 3200);
+  t.style.cssText = [
+    'position:fixed', 'bottom:28px', 'right:28px',
+    'background:' + (error ? '#fff0f0' : '#ffffff'),
+    'border:1px solid ' + (error ? 'var(--red)' : 'var(--border)'),
+    'border-left:3px solid ' + (error ? 'var(--red)' : 'var(--navy)'),
+    'border-radius:8px', 'padding:14px 20px', 'font-size:13px',
+    'z-index:99999', 'opacity:1', 'transform:translateY(0)',
+    'transition:opacity 0.3s', 'max-width:320px',
+    'color:' + (error ? 'var(--red)' : 'var(--text)'),
+    'box-shadow:0 4px 16px rgba(0,0,0,0.12)'
+  ].join(';');
+  clearTimeout(t._toastTimer);
+  t._toastTimer = setTimeout(() => {
+    t.style.opacity = '0';
+    setTimeout(() => { t.style.cssText = ''; }, 300);
+  }, 3200);
 }
 
 // ── PANEL RXH ──
