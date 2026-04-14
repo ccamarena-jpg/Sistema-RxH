@@ -768,9 +768,9 @@
         <input type="text" id="f-banco-otro" readonly style="background:#f8f8f8;color:var(--text-muted)">
       </div>
       <div class="field">
-        <label>N° Cuenta <span style="font-size:10px;color:var(--text-dim)">(13–14 dígitos, sin espacios)</span></label>
+        <label>N° Cuenta <span style="font-size:10px;color:var(--text-dim)">(máx. 18 dígitos, sin espacios)</span></label>
         <input type="text" id="f-cuenta" readonly placeholder="AUTOCOMPLETA" style="background:#f8f8f8;color:var(--text-muted)">
-        <div id="f-cuenta-error" style="display:none;font-size:11px;color:var(--red);margin-top:4px">⚠ Debe tener entre 13 y 14 dígitos</div>
+        <div id="f-cuenta-error" style="display:none;font-size:11px;color:var(--red);margin-top:4px">⚠ Debe tener máximo 18 dígitos</div>
       </div>
       <div class="field span-2">
         <label>N° CCI <span style="font-size:10px;color:var(--text-dim)">(20 dígitos exactos, sin espacios)</span></label>
@@ -1036,6 +1036,7 @@
         <th style="text-align:right;font-weight:700">Total</th>
         <th>Estado</th>
         <th>Observación / Acción</th>
+        <th style="text-align:center">Eliminar</th>
       </tr>
     </thead>
     <tbody id="tbody-mis-registros">
@@ -1561,6 +1562,22 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  // ── AGREGAR PERSONA A BBDD (via GET/JSONP) ──
+  if (accion === 'agregarPersona') {
+    var bbdd = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("BBDD");
+    bbdd.appendRow([
+      e.parameter.nombre,       // A: APELLIDOS Y NOMBRE
+      e.parameter.dni,          // B: DNI
+      e.parameter.ciudad,       // C: CIUDAD
+      e.parameter.departamento, // D: DEPARTAMENTO
+      e.parameter.banco,        // E: BANCO
+      e.parameter.cuenta,       // F: # CUENTA
+      e.parameter.cci,          // G: # CCI
+      'ACTIVO'                  // H: STATUS
+    ]);
+    return respond({status: 'ok'});
+  }
+
   // ── BUSCAR POR DNI ──
   if (accion === 'dni') {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("BBDD");
@@ -2039,8 +2056,8 @@ function doGet(e) {
           oninput="this.value=this.value.toUpperCase()">
       </div>
       <div class="field">
-        <label>N° Cuenta <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--text-dim)">(13–14 dígitos)</span></label>
-        <input type="text" id="np-cuenta" placeholder="Número de cuenta" maxlength="14"
+        <label>N° Cuenta <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--text-dim)">(máx. 18 dígitos)</span></label>
+        <input type="text" id="np-cuenta" placeholder="Número de cuenta" maxlength="18"
           oninput="this.value=this.value.replace(/\D/g,'')">
       </div>
       <div class="field span-2">
@@ -2494,10 +2511,10 @@ async function guardarRegistro() {
 
   // Validar cuenta (13-14 dígitos) — solo si está llena
   const cuentaVal = document.getElementById('f-cuenta').value.replace(/\s/g,'');
-  if (cuentaVal && (cuentaVal.length < 13 || cuentaVal.length > 14)) {
-    document.getElementById('f-cuenta-error').textContent = '⚠ Debe tener entre 13 y 14 dígitos';
+  if (cuentaVal && cuentaVal.length > 18) {
+    document.getElementById('f-cuenta-error').textContent = '⚠ Debe tener máximo 18 dígitos';
     document.getElementById('f-cuenta-error').style.display = 'block';
-    showToast('El N° de cuenta debe tener entre 13 y 14 dígitos', true); return;
+    showToast('El N° de cuenta debe tener máximo 18 dígitos', true); return;
   }
   document.getElementById('f-cuenta-error').style.display = 'none';
 
@@ -2973,7 +2990,7 @@ function renderMisRegistros() {
   document.getElementById('mis-stat-total') && (document.getElementById('mis-stat-total').textContent = 'S/. ' + tot.toLocaleString('es-PE',{minimumFractionDigits:0}));
 
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--text-dim);padding:40px">Sin registros con ese filtro</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-dim);padding:40px">Sin registros con ese filtro</td></tr>';
     return;
   }
 
@@ -3001,6 +3018,9 @@ function renderMisRegistros() {
       <td style="font-size:11px;color:${obs?'var(--orange)':'var(--text-dim)'};min-width:130px">
         ${obs ? `<div style="display:flex;align-items:flex-start;gap:4px;margin-bottom:4px"><span>⚠</span><span>${obs}</span></div>` : '—'}
         ${r.estado === 'OBSERVADO-CUENTAS' ? `<button class="act-btn" style="background:rgba(217,115,32,0.12);color:var(--orange);border:1px solid rgba(217,115,32,0.3);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-weight:600" onclick="abrirEditarMonto(${r.id})">✏ Corregir</button>` : ''}
+      </td>
+      <td style="text-align:center">
+        ${r.estado === 'EN REVISIÓN CUENTAS' ? `<button onclick="confirmarEliminar(${r.id})" title="Eliminar registro" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:16px;padding:4px 8px;border-radius:4px;line-height:1" onmouseover="this.style.background='rgba(217,53,53,0.1)'" onmouseout="this.style.background='none'">🗑</button>` : ''}
       </td>
     </tr>`;
   }).join('');
@@ -3390,20 +3410,9 @@ async function guardarNuevaPersona() {
   if (!ciudad) { showToast('La ciudad es obligatoria', true); return; }
   if (!banco) { showToast('Selecciona un banco', true); return; }
   if (!cuenta) { showToast('El N° de cuenta es obligatorio', true); return; }
-  if (cuenta.length < 13 || cuenta.length > 14) { showToast('El N° de cuenta debe tener entre 13 y 14 dígitos', true); return; }
+  if (cuenta.length > 18) { showToast('El N° de cuenta debe tener máximo 18 dígitos', true); return; }
   if (!cci) { showToast('El N° CCI es obligatorio', true); return; }
   if (cci.length !== 20) { showToast('El N° CCI debe tener exactamente 20 dígitos', true); return; }
-
-  const payload = {
-    accion:       'agregarPersona',
-    nombre:       nombre,
-    dni:          dni,
-    departamento: depto,
-    ciudad:       ciudad,
-    banco:        banco,
-    cuenta:       cuenta,
-    cci:          cci,
-  };
 
   if (!SCRIPT_URL) { showToast('Configura el Apps Script primero', true); return; }
 
@@ -3412,9 +3421,17 @@ async function guardarNuevaPersona() {
   if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
 
   try {
-    const params = new URLSearchParams();
-    params.append('data', JSON.stringify(payload));
-    await fetch(SCRIPT_URL, { method:'POST', body: params, mode:'no-cors' });
+    // Usar el mismo mecanismo GET/JSONP que usa todo el sistema
+    await fetchScript({
+      accion:       'agregarPersona',
+      nombre:       nombre,
+      dni:          dni,
+      departamento: depto,
+      ciudad:       ciudad,
+      banco:        banco,
+      cuenta:       cuenta,
+      cci:          cci
+    });
 
     cerrarModalNuevaPersona();
     setTimeout(() => showToast('✓ Persona agregada a la BBDD correctamente'), 100);
