@@ -462,7 +462,7 @@
     border-radius: 8px;
     padding: 14px 20px;
     font-size: 13px;
-    z-index: 999;
+    z-index: 9999;
     transform: translateY(80px);
     opacity: 0;
     transition: all 0.3s ease;
@@ -3240,12 +3240,20 @@ async function guardarNuevaPersona() {
 
   if (!SCRIPT_URL) { showToast('Configura el Apps Script primero', true); return; }
 
+  // Deshabilitar botón mientras guarda
+  const btn = document.querySelector('#modal-nueva-persona .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
   try {
     const params = new URLSearchParams();
     params.append('data', JSON.stringify(payload));
+    // no-cors: no podemos leer la respuesta pero el dato llega al Sheet
     await fetch(SCRIPT_URL, { method:'POST', body: params, mode:'no-cors' });
 
-    showToast('✓ Persona agregada a la BBDD');
+    // Cerrar modal primero, luego mostrar toast (así es visible)
+    cerrarModalNuevaPersona();
+    setTimeout(() => showToast('✓ Persona agregada a la BBDD correctamente'), 100);
+
     // Auto-llenar el formulario con los datos recién ingresados
     document.getElementById('f-nombre').value       = nombre;
     document.getElementById('f-dni').value          = dni;
@@ -3254,9 +3262,9 @@ async function guardarNuevaPersona() {
     document.getElementById('f-banco').value        = payload.banco;
     document.getElementById('f-cuenta').value       = payload.cuenta;
     document.getElementById('f-cci').value          = payload.cci;
-    cerrarModalNuevaPersona();
   } catch(e) {
     showToast('Error al guardar — intenta de nuevo', true);
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar en BBDD'; }
   }
 }
 
@@ -3275,8 +3283,13 @@ function cargarConfig() {
 
 function guardarConfig() {
   const url = document.getElementById('cfg-script-url').value.trim();
-  if (url) { SCRIPT_URL = url; localStorage.setItem('rxh_script_url', url); showToast('✓ Configuración guardada'); }
-  else showToast('Pega la URL del script primero', true);
+  if (url) {
+    SCRIPT_URL = url;
+    localStorage.setItem('rxh_script_url', url);
+    setTimeout(() => showToast('✓ URL del script guardada correctamente'), 50);
+  } else {
+    showToast('Pega la URL del script primero', true);
+  }
 }
 
 function actualizarScriptURL() {
