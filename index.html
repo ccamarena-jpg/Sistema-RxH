@@ -739,19 +739,19 @@
       </div>
       <div class="field span-2">
         <label>Apellidos y Nombre</label>
-        <input type="text" id="f-nombre" readonly placeholder="Se autocompleta al buscar DNI" style="text-transform:uppercase">
+        <input type="text" id="f-nombre" readonly placeholder="SE AUTOCOMPLETA AL BUSCAR DNI" style="text-transform:uppercase;background:#f8f8f8;color:var(--text-muted)">
       </div>
       <div class="field">
         <label>Departamento</label>
-        <input type="text" id="f-departamento" readonly placeholder="Autocompleta" style="text-transform:uppercase">
+        <input type="text" id="f-departamento" readonly placeholder="AUTOCOMPLETA" style="text-transform:uppercase;background:#f8f8f8;color:var(--text-muted)">
       </div>
       <div class="field">
         <label>Ciudad</label>
-        <input type="text" id="f-ciudad" readonly placeholder="Autocompleta" style="text-transform:uppercase">
+        <input type="text" id="f-ciudad" readonly placeholder="AUTOCOMPLETA" style="text-transform:uppercase;background:#f8f8f8;color:var(--text-muted)">
       </div>
       <div class="field">
         <label>Banco</label>
-        <select id="f-banco">
+        <select id="f-banco" disabled style="background:#f8f8f8;color:var(--text-muted)">
           <option value="">Seleccionar...</option>
           <option>BCP</option>
           <option>INTERBANK</option>
@@ -765,23 +765,16 @@
       </div>
       <div class="field" id="f-banco-otro-wrap" style="display:none">
         <label>Especifica el banco</label>
-        <input type="text" id="f-banco-otro" placeholder="Nombre del banco"
-          oninput="this.value=this.value.toUpperCase()">
+        <input type="text" id="f-banco-otro" readonly style="background:#f8f8f8;color:var(--text-muted)">
       </div>
       <div class="field">
         <label>N° Cuenta <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--text-dim)">(13–14 dígitos, sin espacios)</span></label>
-        <input type="text" id="f-cuenta" placeholder="Autocompleta o ingresa"
-          maxlength="14"
-          oninput="this.value=this.value.replace(/\D/g,'')"
-          onblur="validarCuenta()">
+        <input type="text" id="f-cuenta" readonly placeholder="AUTOCOMPLETA" style="background:#f8f8f8;color:var(--text-muted)">
         <div id="f-cuenta-error" style="display:none;font-size:11px;color:var(--red);margin-top:4px">⚠ Debe tener entre 13 y 14 dígitos</div>
       </div>
       <div class="field span-2">
         <label>N° CCI <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--text-dim)">(20 dígitos exactos, sin espacios)</span></label>
-        <input type="text" id="f-cci" placeholder="Autocompleta o ingresa"
-          maxlength="20"
-          oninput="this.value=this.value.replace(/\D/g,'')"
-          onblur="validarCCI()">
+        <input type="text" id="f-cci" readonly placeholder="AUTOCOMPLETA" style="background:#f8f8f8;color:var(--text-muted)">
         <div id="f-cci-error" style="display:none;font-size:11px;color:var(--red);margin-top:4px">⚠ Debe tener exactamente 20 dígitos</div>
       </div>
     </div>
@@ -2037,12 +2030,14 @@ function doGet(e) {
         </select>
       </div>
       <div class="field">
-        <label>N° Cuenta</label>
-        <input type="text" id="np-cuenta" placeholder="Número de cuenta">
+        <label>N° Cuenta <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--text-dim)">(13–14 dígitos)</span></label>
+        <input type="text" id="np-cuenta" placeholder="Número de cuenta" maxlength="14"
+          oninput="this.value=this.value.replace(/\D/g,'')">
       </div>
       <div class="field span-2">
-        <label>N° CCI (Interbancario)</label>
-        <input type="text" id="np-cci" placeholder="Código de cuenta interbancario">
+        <label>N° CCI (Interbancario) <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--text-dim)">(20 dígitos)</span></label>
+        <input type="text" id="np-cci" placeholder="Código de cuenta interbancario" maxlength="20"
+          oninput="this.value=this.value.replace(/\D/g,'')">
       </div>
     </div>
     <div class="modal-footer">
@@ -2377,6 +2372,8 @@ function asignarBanco(banco) {
   const otroWrap = document.getElementById('f-banco-otro-wrap');
   const bancos = ['BCP','INTERBANK','BBVA','SCOTIABANK','BN','BANBIF','CAJA PIURA'];
   const bancoUp = (banco || '').toUpperCase().trim();
+  // Habilitar temporalmente para asignar valor
+  sel.disabled = false;
   if (bancos.includes(bancoUp)) {
     sel.value = bancoUp;
     otroWrap.style.display = 'none';
@@ -2388,6 +2385,7 @@ function asignarBanco(banco) {
     sel.value = '';
     otroWrap.style.display = 'none';
   }
+  sel.disabled = true;
 }
 
 function toggleOtroBanco() {
@@ -2570,9 +2568,21 @@ async function guardarRegistro() {
 
 function limpiarFormulario() {
   ['f-quincena','f-cliente','f-proyecto','f-supervisor','f-dni','f-nombre','f-departamento',
-   'f-ciudad','f-banco','f-cuenta','f-cci','f-dias','f-pago-dia','f-movilidad-diaria',
+   'f-ciudad','f-cuenta','f-cci','f-dias','f-pago-dia','f-movilidad-diaria',
    'f-mov-adicional','f-mov-viajera','f-adelanto','f-megas','f-otros'].forEach(id => {
     document.getElementById(id).value = '';
+  });
+  // Reset banco (está disabled, hay que habilitarlo momentáneamente)
+  const selBanco = document.getElementById('f-banco');
+  selBanco.disabled = false;
+  selBanco.value = '';
+  selBanco.disabled = true;
+  document.getElementById('f-banco-otro-wrap').style.display = 'none';
+  document.getElementById('f-banco-otro').value = '';
+  // Limpiar errores
+  ['f-cuenta-error','f-cci-error','f-dni-error'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
   });
   document.getElementById('f-pago-dias').value = '';
   document.getElementById('f-movilidad').value = '';
@@ -3348,18 +3358,32 @@ function cerrarModalNuevaPersona() {
 async function guardarNuevaPersona() {
   const nombre = document.getElementById('np-nombre').value.trim().toUpperCase();
   const dni    = document.getElementById('np-dni').value.trim();
-  if (!nombre || !dni || dni.length !== 8) {
-    showToast('Nombre y DNI (8 dígitos) son obligatorios', true); return;
-  }
+  const depto  = document.getElementById('np-departamento').value.trim().toUpperCase();
+  const ciudad = document.getElementById('np-ciudad').value.trim();
+  const banco  = document.getElementById('np-banco').value.trim();
+  const cuenta = document.getElementById('np-cuenta').value.trim().replace(/\s/g,'');
+  const cci    = document.getElementById('np-cci').value.trim().replace(/\s/g,'');
+
+  // Validaciones una por una con mensaje específico
+  if (!nombre) { showToast('El nombre es obligatorio', true); return; }
+  if (!dni || dni.length !== 8) { showToast('El DNI debe tener exactamente 8 dígitos', true); return; }
+  if (!depto) { showToast('El departamento es obligatorio', true); return; }
+  if (!ciudad) { showToast('La ciudad es obligatoria', true); return; }
+  if (!banco) { showToast('Selecciona un banco', true); return; }
+  if (!cuenta) { showToast('El N° de cuenta es obligatorio', true); return; }
+  if (cuenta.length < 13 || cuenta.length > 14) { showToast('El N° de cuenta debe tener entre 13 y 14 dígitos', true); return; }
+  if (!cci) { showToast('El N° CCI es obligatorio', true); return; }
+  if (cci.length !== 20) { showToast('El N° CCI debe tener exactamente 20 dígitos', true); return; }
+
   const payload = {
     accion:       'agregarPersona',
     nombre:       nombre,
     dni:          dni,
-    departamento: document.getElementById('np-departamento').value.trim().toUpperCase(),
-    ciudad:       document.getElementById('np-ciudad').value.trim(),
-    banco:        document.getElementById('np-banco').value,
-    cuenta:       document.getElementById('np-cuenta').value.trim(),
-    cci:          document.getElementById('np-cci').value.trim(),
+    departamento: depto,
+    ciudad:       ciudad,
+    banco:        banco,
+    cuenta:       cuenta,
+    cci:          cci,
   };
 
   if (!SCRIPT_URL) { showToast('Configura el Apps Script primero', true); return; }
@@ -3371,21 +3395,19 @@ async function guardarNuevaPersona() {
   try {
     const params = new URLSearchParams();
     params.append('data', JSON.stringify(payload));
-    // no-cors: no podemos leer la respuesta pero el dato llega al Sheet
     await fetch(SCRIPT_URL, { method:'POST', body: params, mode:'no-cors' });
 
-    // Cerrar modal primero, luego mostrar toast (así es visible)
     cerrarModalNuevaPersona();
     setTimeout(() => showToast('✓ Persona agregada a la BBDD correctamente'), 100);
 
-    // Auto-llenar el formulario con los datos recién ingresados
+    // Auto-llenar el formulario principal
     document.getElementById('f-nombre').value       = nombre;
     document.getElementById('f-dni').value          = dni;
-    document.getElementById('f-departamento').value = payload.departamento;
-    document.getElementById('f-ciudad').value       = payload.ciudad;
-    document.getElementById('f-banco').value        = payload.banco;
-    document.getElementById('f-cuenta').value       = payload.cuenta;
-    document.getElementById('f-cci').value          = payload.cci;
+    document.getElementById('f-departamento').value = depto;
+    document.getElementById('f-ciudad').value       = ciudad;
+    asignarBanco(banco);
+    document.getElementById('f-cuenta').value       = cuenta;
+    document.getElementById('f-cci').value          = cci;
   } catch(e) {
     showToast('Error al guardar — intenta de nuevo', true);
     if (btn) { btn.disabled = false; btn.textContent = 'Guardar en BBDD'; }
