@@ -768,12 +768,12 @@
         <input type="text" id="f-banco-otro" readonly style="background:#f8f8f8;color:var(--text-muted)">
       </div>
       <div class="field">
-        <label>N° Cuenta <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--text-dim)">(13–14 dígitos, sin espacios)</span></label>
+        <label>N° Cuenta <span style="font-size:10px;color:var(--text-dim)">(13–14 dígitos, sin espacios)</span></label>
         <input type="text" id="f-cuenta" readonly placeholder="AUTOCOMPLETA" style="background:#f8f8f8;color:var(--text-muted)">
         <div id="f-cuenta-error" style="display:none;font-size:11px;color:var(--red);margin-top:4px">⚠ Debe tener entre 13 y 14 dígitos</div>
       </div>
       <div class="field span-2">
-        <label>N° CCI <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--text-dim)">(20 dígitos exactos, sin espacios)</span></label>
+        <label>N° CCI <span style="font-size:10px;color:var(--text-dim)">(20 dígitos exactos, sin espacios)</span></label>
         <input type="text" id="f-cci" readonly placeholder="AUTOCOMPLETA" style="background:#f8f8f8;color:var(--text-muted)">
         <div id="f-cci-error" style="display:none;font-size:11px;color:var(--red);margin-top:4px">⚠ Debe tener exactamente 20 dígitos</div>
       </div>
@@ -2492,14 +2492,9 @@ async function guardarRegistro() {
   const bancoFinal = getBancoFinal();
   if (!bancoFinal) { showToast('Selecciona un banco', true); return; }
 
-  // Validar cuenta (13-14 dígitos)
+  // Validar cuenta (13-14 dígitos) — solo si está llena
   const cuentaVal = document.getElementById('f-cuenta').value.replace(/\s/g,'');
-  if (!cuentaVal) {
-    document.getElementById('f-cuenta-error').textContent = '⚠ El N° de cuenta es obligatorio';
-    document.getElementById('f-cuenta-error').style.display = 'block';
-    showToast('Ingresa el N° de cuenta bancaria', true); return;
-  }
-  if (cuentaVal.length < 13 || cuentaVal.length > 14) {
+  if (cuentaVal && (cuentaVal.length < 13 || cuentaVal.length > 14)) {
     document.getElementById('f-cuenta-error').textContent = '⚠ Debe tener entre 13 y 14 dígitos';
     document.getElementById('f-cuenta-error').style.display = 'block';
     showToast('El N° de cuenta debe tener entre 13 y 14 dígitos', true); return;
@@ -2507,12 +2502,7 @@ async function guardarRegistro() {
   document.getElementById('f-cuenta-error').style.display = 'none';
 
   const cciVal = document.getElementById('f-cci').value.replace(/\s/g,'');
-  if (!cciVal) {
-    document.getElementById('f-cci-error').textContent = '⚠ El N° CCI es obligatorio';
-    document.getElementById('f-cci-error').style.display = 'block';
-    showToast('Ingresa el N° CCI (interbancario)', true); return;
-  }
-  if (cciVal.length !== 20) {
+  if (cciVal && cciVal.length !== 20) {
     document.getElementById('f-cci-error').textContent = '⚠ Debe tener exactamente 20 dígitos';
     document.getElementById('f-cci-error').style.display = 'block';
     showToast('El N° CCI debe tener exactamente 20 dígitos', true); return;
@@ -3429,7 +3419,7 @@ async function guardarNuevaPersona() {
     cerrarModalNuevaPersona();
     setTimeout(() => showToast('✓ Persona agregada a la BBDD correctamente'), 100);
 
-    // Auto-llenar el formulario principal
+    // Auto-llenar el formulario principal con los datos recién ingresados
     document.getElementById('f-nombre').value       = nombre;
     document.getElementById('f-dni').value          = dni;
     document.getElementById('f-departamento').value = depto;
