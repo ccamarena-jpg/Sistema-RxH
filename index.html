@@ -730,34 +730,59 @@
       <div class="field span-2">
         <label>DNI — busca al trabajador</label>
         <div class="input-row">
-          <input type="text" id="f-dni" placeholder="Ingresa el DNI..." maxlength="8" oninput="this.value=this.value.replace(/\D/g,'')">
+          <input type="text" id="f-dni" placeholder="8 dígitos exactos..." maxlength="8"
+            oninput="this.value=this.value.replace(/\D/g,'')">
           <button class="lookup-btn" onclick="buscarDNI()">Buscar →</button>
           <button class="lookup-btn" onclick="abrirModalNuevaPersona()" style="background:var(--green);margin-left:6px;" title="Agregar nuevo trabajador a la BBDD">+ Nuevo</button>
         </div>
+        <div id="f-dni-error" style="display:none;font-size:11px;color:var(--red);margin-top:4px">⚠ El DNI debe tener exactamente 8 dígitos</div>
       </div>
       <div class="field span-2">
         <label>Apellidos y Nombre</label>
-        <input type="text" id="f-nombre" readonly placeholder="Se autocompleta al buscar DNI">
+        <input type="text" id="f-nombre" readonly placeholder="Se autocompleta al buscar DNI" style="text-transform:uppercase">
       </div>
       <div class="field">
         <label>Departamento</label>
-        <input type="text" id="f-departamento" readonly placeholder="Autocompleta">
+        <input type="text" id="f-departamento" readonly placeholder="Autocompleta" style="text-transform:uppercase">
       </div>
       <div class="field">
         <label>Ciudad</label>
-        <input type="text" id="f-ciudad" readonly placeholder="Autocompleta">
+        <input type="text" id="f-ciudad" readonly placeholder="Autocompleta" style="text-transform:uppercase">
       </div>
       <div class="field">
         <label>Banco</label>
-        <input type="text" id="f-banco" readonly placeholder="Autocompleta">
+        <select id="f-banco" onchange="toggleOtroBanco()">
+          <option value="">Seleccionar...</option>
+          <option>BCP</option>
+          <option>INTERBANK</option>
+          <option>BBVA</option>
+          <option>SCOTIABANK</option>
+          <option>BN</option>
+          <option>BANBIF</option>
+          <option>CAJA PIURA</option>
+          <option value="OTRO">Otro...</option>
+        </select>
+      </div>
+      <div class="field" id="f-banco-otro-wrap" style="display:none">
+        <label>Especifica el banco</label>
+        <input type="text" id="f-banco-otro" placeholder="Nombre del banco"
+          oninput="this.value=this.value.toUpperCase()">
       </div>
       <div class="field">
-        <label>N° Cuenta</label>
-        <input type="text" id="f-cuenta" readonly placeholder="Autocompleta">
+        <label>N° Cuenta <span style="font-size:10px;color:var(--text-dim)">(13–14 dígitos, sin espacios)</span></label>
+        <input type="text" id="f-cuenta" placeholder="Autocompleta o ingresa"
+          maxlength="14"
+          oninput="this.value=this.value.replace(/\D/g,'')"
+          onblur="validarCuenta()">
+        <div id="f-cuenta-error" style="display:none;font-size:11px;color:var(--red);margin-top:4px">⚠ Debe tener entre 13 y 14 dígitos</div>
       </div>
       <div class="field span-2">
-        <label>N° CCI</label>
-        <input type="text" id="f-cci" readonly placeholder="Autocompleta">
+        <label>N° CCI <span style="font-size:10px;color:var(--text-dim)">(20 dígitos exactos, sin espacios)</span></label>
+        <input type="text" id="f-cci" placeholder="Autocompleta o ingresa"
+          maxlength="20"
+          oninput="this.value=this.value.replace(/\D/g,'')"
+          onblur="validarCCI()">
+        <div id="f-cci-error" style="display:none;font-size:11px;color:var(--red);margin-top:4px">⚠ Debe tener exactamente 20 dígitos</div>
       </div>
     </div>
   </div>
@@ -1516,6 +1541,11 @@
     "No",                  // AJ: APROBADO CONTABILIDAD
     "No"                   // AK: REPORTE DE GASTOS EMITIDO
   ]);
+  
+  // Forzar columnas L (# CUENTA) y M (# CCI) como texto para preservar ceros iniciales
+  var lastRow = sheet.getLastRow();
+  sheet.getRange(lastRow, 12).setNumberFormat('@');  // L: # CUENTA
+  sheet.getRange(lastRow, 13).setNumberFormat('@');  // M: # CCI
   
   return ContentService
     .createTextOutput(JSON.stringify({status:"ok"}))
@@ -2293,23 +2323,27 @@ function filterSupervisores() {
 // ── BUSCAR DNI ──
 async function buscarDNI() {
   const dni = document.getElementById('f-dni').value.trim();
-  if (dni.length !== 8) { showToast('Ingresa un DNI de 8 dígitos', true); return; }
+  const errDni = document.getElementById('f-dni-error');
+  if (dni.length !== 8) {
+    if (errDni) errDni.style.display = 'block';
+    showToast('Ingresa un DNI de 8 dígitos', true); return;
+  }
+  if (errDni) errDni.style.display = 'none';
 
   if (SCRIPT_URL) {
     try {
       const data = await fetchScript({accion: 'dni', dni: dni});
       if (data.found) {
-        document.getElementById('f-nombre').value       = data.nombre;
-        document.getElementById('f-departamento').value = data.departamento || data.ubigeo || '';
-        document.getElementById('f-ciudad').value       = data.ciudad;
-        document.getElementById('f-banco').value        = data.banco;
-        document.getElementById('f-cuenta').value       = data.cuenta;
-        document.getElementById('f-cci').value          = data.cci;
+        document.getElementById('f-nombre').value       = (data.nombre || '').toUpperCase();
+        document.getElementById('f-departamento').value = (data.departamento || data.ubigeo || '').toUpperCase();
+        document.getElementById('f-ciudad').value       = (data.ciudad || '').toUpperCase();
+        asignarBanco(data.banco || '');
+        document.getElementById('f-cuenta').value       = (data.cuenta || '').replace(/\s/g, '');
+        document.getElementById('f-cci').value          = (data.cci || '').replace(/\s/g, '');
         showToast('✓ Trabajador encontrado');
         return;
       } else {
         showToast('DNI no encontrado — puedes agregarlo a la BBDD', true);
-        // Pre-llenar el DNI en el modal de nueva persona
         document.getElementById('np-dni').value = dni;
         document.getElementById('modal-nueva-persona').style.display = 'flex';
         return;
@@ -2319,22 +2353,72 @@ async function buscarDNI() {
 
   // Demo fallback
   const demo = {
-    '45678901': { nombre:'LÓPEZ DÍAZ, Juan',    departamento:'LIMA',     ciudad:'Lima',     banco:'BCP',       cuenta:'19112345678',     cci:'002-19112345678-01' },
-    '52341678': { nombre:'TORRES SILVA, Ana',   departamento:'AREQUIPA', ciudad:'Arequipa', banco:'INTERBANK', cuenta:'200-123456789',   cci:'003-200-123456789-01' },
-    '31456789': { nombre:'RAMÍREZ POMA, Pedro', departamento:'LIMA',     ciudad:'Lima',     banco:'BBVA',      cuenta:'0011-0111-01234', cci:'011-011-000112345678' },
+    '45678901': { nombre:'LÓPEZ DÍAZ, JUAN',    departamento:'LIMA', ciudad:'LIMA', banco:'BCP',       cuenta:'1911234567890',   cci:'00219112345678901' },
+    '52341678': { nombre:'TORRES SILVA, ANA',   departamento:'LIMA', ciudad:'LIMA', banco:'INTERBANK', cuenta:'2001234567890',   cci:'00320012345678901' },
+    '31456789': { nombre:'RAMÍREZ POMA, PEDRO', departamento:'LIMA', ciudad:'LIMA', banco:'BBVA',      cuenta:'0111234567890',   cci:'01101100001123456' },
   };
   if (demo[dni]) {
     const d = demo[dni];
     document.getElementById('f-nombre').value       = d.nombre;
     document.getElementById('f-departamento').value = d.departamento;
     document.getElementById('f-ciudad').value       = d.ciudad;
-    document.getElementById('f-banco').value        = d.banco;
+    asignarBanco(d.banco);
     document.getElementById('f-cuenta').value       = d.cuenta;
     document.getElementById('f-cci').value          = d.cci;
     showToast('✓ Trabajador encontrado (demo)');
   } else {
     showToast('DNI no encontrado en la BBDD', true);
   }
+}
+
+// ── BANCO HELPERS ──
+function asignarBanco(banco) {
+  const sel = document.getElementById('f-banco');
+  const otroWrap = document.getElementById('f-banco-otro-wrap');
+  const bancos = ['BCP','INTERBANK','BBVA','SCOTIABANK','BN','BANBIF','CAJA PIURA'];
+  const bancoUp = (banco || '').toUpperCase().trim();
+  if (bancos.includes(bancoUp)) {
+    sel.value = bancoUp;
+    otroWrap.style.display = 'none';
+  } else if (bancoUp) {
+    sel.value = 'OTRO';
+    otroWrap.style.display = '';
+    document.getElementById('f-banco-otro').value = bancoUp;
+  } else {
+    sel.value = '';
+    otroWrap.style.display = 'none';
+  }
+}
+
+function toggleOtroBanco() {
+  const sel = document.getElementById('f-banco');
+  const otroWrap = document.getElementById('f-banco-otro-wrap');
+  otroWrap.style.display = sel.value === 'OTRO' ? '' : 'none';
+  if (sel.value !== 'OTRO') document.getElementById('f-banco-otro').value = '';
+}
+
+function getBancoFinal() {
+  const sel = document.getElementById('f-banco');
+  if (sel.value === 'OTRO') return document.getElementById('f-banco-otro').value.trim().toUpperCase();
+  return sel.value;
+}
+
+function validarCuenta() {
+  const v = document.getElementById('f-cuenta').value.replace(/\s/g,'');
+  const err = document.getElementById('f-cuenta-error');
+  if (v && (v.length < 13 || v.length > 14)) {
+    err.style.display = 'block'; return false;
+  }
+  err.style.display = 'none'; return true;
+}
+
+function validarCCI() {
+  const v = document.getElementById('f-cci').value.replace(/\s/g,'');
+  const err = document.getElementById('f-cci-error');
+  if (v && v.length !== 20) {
+    err.style.display = 'block'; return false;
+  }
+  err.style.display = 'none'; return true;
 }
 
 // ── CALCULAR TOTAL ──
@@ -2374,8 +2458,32 @@ async function guardarRegistro() {
     }
   }
 
+  // Validar DNI exactamente 8 dígitos
+  const _dni = document.getElementById('f-dni').value.trim();
+  if (_dni.length !== 8) {
+    document.getElementById('f-dni-error').style.display = 'block';
+    showToast('El DNI debe tener exactamente 8 dígitos', true); return;
+  }
+
+  // Validar banco
+  const bancoFinal = getBancoFinal();
+  if (!bancoFinal) { showToast('Selecciona un banco', true); return; }
+
+  // Validar cuenta (13-14 dígitos)
+  const cuentaVal = document.getElementById('f-cuenta').value.replace(/\s/g,'');
+  if (cuentaVal && (cuentaVal.length < 13 || cuentaVal.length > 14)) {
+    document.getElementById('f-cuenta-error').style.display = 'block';
+    showToast('El N° de cuenta debe tener entre 13 y 14 dígitos', true); return;
+  }
+
+  // Validar CCI (20 dígitos)
+  const cciVal = document.getElementById('f-cci').value.replace(/\s/g,'');
+  if (cciVal && cciVal.length !== 20) {
+    document.getElementById('f-cci-error').style.display = 'block';
+    showToast('El N° CCI debe tener exactamente 20 dígitos', true); return;
+  }
+
   // Validación de duplicados
-  const _dni      = document.getElementById('f-dni').value.trim();
   const _proyecto = document.getElementById('f-proyecto').value;
   const _quincena = document.getElementById('f-quincena').value;
   if (_dni && _proyecto && _quincena && esDuplicado(_dni, _proyecto, _quincena)) {
@@ -2398,13 +2506,13 @@ async function guardarRegistro() {
     proyecto:      document.getElementById('f-proyecto').value,
     supervisor:    document.getElementById('f-supervisor').value,
     ejCuentas:     document.getElementById('f-ej-cuentas').value,
-    nombre:        document.getElementById('f-nombre').value,
-    dni:           document.getElementById('f-dni').value,
-    departamento:  document.getElementById('f-departamento').value,
-    ciudad:        document.getElementById('f-ciudad').value,
-    banco:         document.getElementById('f-banco').value,
-    cuenta:        document.getElementById('f-cuenta').value,
-    cci:           document.getElementById('f-cci').value,
+    nombre:        document.getElementById('f-nombre').value.toUpperCase(),
+    dni:           _dni,
+    departamento:  document.getElementById('f-departamento').value.toUpperCase(),
+    ciudad:        document.getElementById('f-ciudad').value.toUpperCase(),
+    banco:         bancoFinal,
+    cuenta:        cuentaVal,
+    cci:           cciVal,
     dias:          dias,
     pagoDia:       pagoDia,
     pagoDias:      dias * pagoDia,
