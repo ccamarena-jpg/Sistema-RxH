@@ -2001,33 +2001,42 @@ function doGet(e) {
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px;">
       <div class="field span-2">
         <label>Apellidos y Nombre <span style="color:var(--red)">*</span></label>
-        <input type="text" id="np-nombre" placeholder="APELLIDOS, Nombre" style="text-transform:uppercase">
+        <input type="text" id="np-nombre" placeholder="APELLIDOS, NOMBRE"
+          oninput="this.value=this.value.toUpperCase()">
       </div>
       <div class="field">
         <label>DNI <span style="color:var(--red)">*</span></label>
-        <input type="text" id="np-dni" maxlength="8" placeholder="12345678">
+        <input type="text" id="np-dni" maxlength="8" placeholder="12345678"
+          oninput="this.value=this.value.replace(/\D/g,'')">
       </div>
       <div class="field">
-        <label>Departamento</label>
-        <input type="text" id="np-departamento" placeholder="LIMA">
+        <label>Departamento <span style="color:var(--red)">*</span></label>
+        <input type="text" id="np-departamento" placeholder="LIMA"
+          oninput="this.value=this.value.toUpperCase()">
       </div>
       <div class="field">
-        <label>Ciudad</label>
-        <input type="text" id="np-ciudad" placeholder="Lima">
+        <label>Ciudad <span style="color:var(--red)">*</span></label>
+        <input type="text" id="np-ciudad" placeholder="Lima"
+          oninput="this.value=this.value.toUpperCase()">
       </div>
       <div class="field">
-        <label>Banco</label>
-        <select id="np-banco">
+        <label>Banco <span style="color:var(--red)">*</span></label>
+        <select id="np-banco" onchange="toggleOtroBancoModal()">
           <option value="">Seleccionar...</option>
-          <option>BCP</option>
-          <option>INTERBANK</option>
-          <option>BBVA</option>
-          <option>SCOTIABANK</option>
-          <option>BN</option>
-          <option>BANBIF</option>
-          <option>CAJA PIURA</option>
-          <option>OTRO</option>
+          <option value="BCP">BCP</option>
+          <option value="INTERBANK">INTERBANK</option>
+          <option value="BBVA">BBVA</option>
+          <option value="SCOTIABANK">SCOTIABANK</option>
+          <option value="BN">BN</option>
+          <option value="BANBIF">BANBIF</option>
+          <option value="CAJA PIURA">CAJA PIURA</option>
+          <option value="OTRO">Otro...</option>
         </select>
+      </div>
+      <div class="field" id="np-banco-otro-wrap" style="display:none">
+        <label>Especifica el banco <span style="color:var(--red)">*</span></label>
+        <input type="text" id="np-banco-otro" placeholder="Nombre del banco"
+          oninput="this.value=this.value.toUpperCase()">
       </div>
       <div class="field">
         <label>N° Cuenta <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--text-dim)">(13–14 dígitos)</span></label>
@@ -2196,7 +2205,10 @@ async function cargarProyectos() {
     const supSet = new Set();
     // Construir mapa: cliente -> proyecto -> [supervisores]
     window._proyectosData = {};
-    window._proyectosRaw  = data.proyectos; // guardar raw para filtro ejecutivo
+    window._proyectosRaw = data.proyectos.map(p => ({
+      ...p,
+      ejCuentas: p.ejCuentas || p.gerente || ''  // fallback a gerente si ejCuentas vacío
+    }));
     data.proyectos.forEach(p => {
       const status = (p.status || '').toUpperCase();
       if (status === 'CERRADO') return;
@@ -2393,6 +2405,19 @@ function toggleOtroBanco() {
   const otroWrap = document.getElementById('f-banco-otro-wrap');
   otroWrap.style.display = sel.value === 'OTRO' ? '' : 'none';
   if (sel.value !== 'OTRO') document.getElementById('f-banco-otro').value = '';
+}
+
+function toggleOtroBancoModal() {
+  const sel = document.getElementById('np-banco');
+  const wrap = document.getElementById('np-banco-otro-wrap');
+  wrap.style.display = sel.value === 'OTRO' ? '' : 'none';
+  if (sel.value !== 'OTRO') document.getElementById('np-banco-otro').value = '';
+}
+
+function getBancoModal() {
+  const sel = document.getElementById('np-banco');
+  if (sel.value === 'OTRO') return document.getElementById('np-banco-otro').value.trim().toUpperCase();
+  return sel.value;
 }
 
 function getBancoFinal() {
@@ -3349,10 +3374,14 @@ function abrirModalNuevaPersona() {
 
 function cerrarModalNuevaPersona() {
   document.getElementById('modal-nueva-persona').style.display = 'none';
-  ['np-nombre','np-dni','np-departamento','np-ciudad','np-banco','np-cuenta','np-cci'].forEach(id => {
+  ['np-nombre','np-dni','np-departamento','np-ciudad','np-cuenta','np-cci','np-banco-otro'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
+  const sel = document.getElementById('np-banco');
+  if (sel) sel.value = '';
+  const wrap = document.getElementById('np-banco-otro-wrap');
+  if (wrap) wrap.style.display = 'none';
 }
 
 async function guardarNuevaPersona() {
@@ -3360,7 +3389,7 @@ async function guardarNuevaPersona() {
   const dni    = document.getElementById('np-dni').value.trim();
   const depto  = document.getElementById('np-departamento').value.trim().toUpperCase();
   const ciudad = document.getElementById('np-ciudad').value.trim();
-  const banco  = document.getElementById('np-banco').value.trim();
+  const banco  = getBancoModal();
   const cuenta = document.getElementById('np-cuenta').value.trim().replace(/\s/g,'');
   const cci    = document.getElementById('np-cci').value.trim().replace(/\s/g,'');
 
