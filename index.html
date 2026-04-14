@@ -1597,7 +1597,7 @@ function doGet(e) {
         cliente:     colP(row, 'CLIENTE'),
         proyecto:    colP(row, 'PROYECTO'),
         supervisor:  colP(row, 'SUPERVISOR'),
-        ejCuentas:   colP(row, 'EJECUTIVO DE CUENTAS') || colP(row, 'EJ. CUENTAS') || colP(row, 'EJECUTIVO CUENTAS') || '',
+        ejCuentas:   colP(row, 'EJECUTIVO DE CUENTAS') || colP(row, 'EJ. CUENTAS') || colP(row, 'EJECUTIVO CUENTAS') || colP(row, 'GERENTE') || '',
         fechaInicio: fechaStr,
         status:      colP(row, 'STATUS') || colP(row, 'ESTADO') || 'ACTIVO'
       });
@@ -1633,7 +1633,7 @@ function doGet(e) {
         cliente:         col(row, 'CLIENTE'),
         proyecto:        col(row, 'PROYECTO'),
         supervisor:      col(row, 'SUPERVISOR'),
-        ejCuentas:       col(row, 'EJECUTIVO DE CUENTAS') || col(row, 'EJ. CUENTAS') || col(row, 'EJECUTIVO CUENTAS') || '',
+        ejCuentas:       col(row, 'EJECUTIVO DE CUENTAS') || col(row, 'EJ. CUENTAS') || col(row, 'EJECUTIVO CUENTAS') || col(row, 'GERENTE') || '',
         nombre:          col(row, 'APELLIDOS Y NOMBRE'),
         dni:             String(col(row, 'DNI')),
         departamento:    col(row, 'DEPARTAMENTO'),
