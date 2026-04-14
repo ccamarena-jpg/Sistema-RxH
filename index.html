@@ -716,7 +716,9 @@
       </div>
       <div class="field">
         <label>Ejecutivo de Cuentas</label>
-        <input type="text" id="f-ej-cuentas" readonly placeholder="Se autocompleta al elegir proyecto" style="background:#f8f8f8;color:var(--text-muted)">
+        <select id="f-ej-cuentas">
+          <option value="">Seleccionar...</option>
+        </select>
       </div>
     </div>
   </div>
@@ -730,6 +732,7 @@
         <div class="input-row">
           <input type="text" id="f-dni" placeholder="Ingresa el DNI..." maxlength="8" oninput="this.value=this.value.replace(/\D/g,'')">
           <button class="lookup-btn" onclick="buscarDNI()">Buscar →</button>
+          <button class="lookup-btn" onclick="abrirModalNuevaPersona()" style="background:var(--green);margin-left:6px;" title="Agregar nuevo trabajador a la BBDD">+ Nuevo</button>
         </div>
       </div>
       <div class="field span-2">
@@ -1370,14 +1373,14 @@
   <!-- Instrucciones de columnas -->
   <div class="form-card">
     <div class="form-card-title">📄 Formato requerido del Excel</div>
-    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">El archivo debe tener estas columnas en el orden exacto (fila 1 = encabezados):</p>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">El archivo debe tener estas columnas en el orden exacto (fila 1 = encabezados, sin columna de fecha — esta se genera automáticamente):</p>
     <div style="overflow-x:auto">
     <table class="records-table" style="font-size:12px">
       <thead><tr>
-        <th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>I</th><th>J</th><th>K</th><th>L</th><th>M</th>
+        <th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>I</th><th>J</th><th>K</th><th>L</th><th>M</th><th>N</th>
       </tr></thead>
       <tbody><tr>
-        <td>Quincena</td><td>Cliente</td><td>Proyecto</td><td>Supervisor</td><td>DNI</td><td>Días</td><td>Pago/día</td><td>Mov.diaria</td><td>Mov.adicional</td><td>Mov.viajera</td><td>Adelanto</td><td>Megas</td><td>Otros</td>
+        <td>Quincena</td><td>Cliente</td><td>Proyecto</td><td>Supervisor</td><td>Ej. Cuentas</td><td>DNI</td><td>Días</td><td>Pago/día</td><td>Mov.diaria</td><td>Mov.adicional</td><td>Mov.viajera</td><td>Adelanto</td><td>Megas</td><td>Otros</td>
       </tr></tbody>
     </table>
     </div>
@@ -1456,9 +1459,23 @@
       <h3>Abre el editor de Apps Script</h3>
       <p>En tu Google Sheet, ve a <strong>Extensiones → Apps Script</strong>. Se abrirá un editor de código. Borra todo lo que haya y pega el siguiente código:</p>
       <div class="code-block" id="apps-script-code"><button class="copy-code-btn" onclick="copiarCodigo()">Copiar</button>function doPost(e) {
+  var data = JSON.parse(e.parameter.data || e.postData.contents);
+
+  // ── AGREGAR PERSONA A BBDD ──
+  if (data.accion === 'agregarPersona') {
+    var bbdd = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("BBDD");
+    bbdd.appendRow([
+      data.nombre, data.dni, data.ciudad, data.departamento,
+      data.banco, data.cuenta, data.cci, 'ACTIVO'
+    ]);
+    return ContentService
+      .createTextOutput(JSON.stringify({status:"ok"}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // ── GUARDAR REGISTRO ──
   var sheet = SpreadsheetApp.getActiveSpreadsheet()
               .getSheetByName("REGISTROS");
-  var data  = JSON.parse(e.parameter.data || e.postData.contents);
   
   sheet.appendRow([
     new Date(),            // A: FECHA DE REGISTRO
@@ -1466,38 +1483,38 @@
     data.cliente,          // C: CLIENTE
     data.proyecto,         // D: PROYECTO
     data.supervisor,       // E: SUPERVISOR
-    data.ejCuentas,        // F: EJECUTIVO DE CUENTAS ← nuevo
+    data.ejCuentas,        // F: EJECUTIVO DE CUENTAS
     data.nombre,           // G: APELLIDOS Y NOMBRE
-    data.dni,              // G: DNI
-    data.departamento,     // H: DEPARTAMENTO
-    data.ciudad,           // I: CIUDAD
-    data.banco,            // J: BANCO
-    data.cuenta,           // K: # CUENTA
-    data.cci,              // L: # CCI
-    data.dias,             // M: DÍAS TRABAJADOS
-    data.pagoDia,          // N: PAGO POR DÍA
-    data.pagoDias,         // O: PAGO POR DÍAS TRABAJADOS (M*N)
-    data.movilidadDia,     // P: PAGO MOVILIDAD DIARIA
-    data.movilidad,        // Q: MOVILIDAD (M*P)
-    data.movAdicional,     // R: MOVILIDAD ADICIONAL
-    data.movViajera,       // S: MOVILIDAD VIAJERA
-    data.megas,            // T: DATOS INTERNET
-    data.otros,            // U: OTROS CONCEPTOS
-    data.adelanto,         // V: ADELANTO MOV VIAJERA
-    data.total,            // W: TOTAL A PAGAR
-    data.rxh,              // X: EMITIÓ RXH
-    data.fechaRxh,         // Y: FECHA EMISIÓN
-    data.numRxh,           // Z: # RECIBO
-    data.emisor,           // AA: NOMBRE DEL EMISOR
-    data.fechaAbono,       // AB: FECHA DE ABONO
-    "EN REVISIÓN CUENTAS", // AB: ESTADO
-    "",                    // AC: OBSERVACION CUENTAS
-    "",                    // AD: FECHA APROBACION CUENTAS
-    "",                    // AE: APROBADO POR GERENTE
-    "",                    // AF: OBSERVACION CONTABILIDAD
-    "",                    // AG: FECHA APROBACION CONTABILIDAD
-    "No",                  // AH: APROBADO CONTABILIDAD
-    "No"                   // AI: REPORTE DE GASTOS EMITIDO
+    data.dni,              // H: DNI
+    data.departamento,     // I: DEPARTAMENTO
+    data.ciudad,           // J: CIUDAD
+    data.banco,            // K: BANCO
+    data.cuenta,           // L: # CUENTA
+    data.cci,              // M: # CCI
+    data.dias,             // N: DÍAS TRABAJADOS
+    data.pagoDia,          // O: PAGO POR DÍA
+    data.pagoDias,         // P: PAGO POR DÍAS TRABAJADOS (N*O)
+    data.movilidadDia,     // Q: PAGO MOVILIDAD DIARIA
+    data.movilidad,        // R: MOVILIDAD (N*Q)
+    data.movAdicional,     // S: MOVILIDAD ADICIONAL
+    data.movViajera,       // T: MOVILIDAD VIAJERA
+    data.megas,            // U: DATOS INTERNET
+    data.otros,            // V: OTROS CONCEPTOS
+    data.adelanto,         // W: ADELANTO MOV VIAJERA
+    parseFloat(data.total) || 0, // X: TOTAL A PAGAR (número)
+    data.rxh,              // Y: EMITIÓ RXH
+    data.fechaRxh,         // Z: FECHA EMISIÓN
+    data.numRxh,           // AA: # RECIBO
+    data.emisor,           // AB: NOMBRE DEL EMISOR
+    data.fechaAbono,       // AC: FECHA DE ABONO
+    "EN REVISIÓN CUENTAS", // AD: ESTADO
+    "",                    // AE: OBSERVACION CUENTAS
+    "",                    // AF: FECHA APROBACION CUENTAS
+    "",                    // AG: APROBADO POR GERENTE
+    "",                    // AH: OBSERVACION CONTABILIDAD
+    "",                    // AI: FECHA APROBACION CONTABILIDAD
+    "No",                  // AJ: APROBADO CONTABILIDAD
+    "No"                   // AK: REPORTE DE GASTOS EMITIDO
   ]);
   
   return ContentService
@@ -1950,8 +1967,59 @@ function doGet(e) {
   </div>
 </div>
 
-<!-- TOAST -->
-<div class="toast" id="toast"></div>
+<!-- MODAL NUEVA PERSONA -->
+<div class="modal-overlay" id="modal-nueva-persona" style="display:none; position:fixed; inset:0; background:rgba(15,35,71,0.5); z-index:300; align-items:center; justify-content:center;">
+  <div class="modal" style="max-width:520px; width:100%;">
+    <div class="modal-title">➕ Agregar nuevo personal a BBDD</div>
+    <div class="modal-sub">El trabajador quedará registrado y podrás buscarlo por DNI en el futuro.</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px;">
+      <div class="field span-2">
+        <label>Apellidos y Nombre <span style="color:var(--red)">*</span></label>
+        <input type="text" id="np-nombre" placeholder="APELLIDOS, Nombre" style="text-transform:uppercase">
+      </div>
+      <div class="field">
+        <label>DNI <span style="color:var(--red)">*</span></label>
+        <input type="text" id="np-dni" maxlength="8" placeholder="12345678">
+      </div>
+      <div class="field">
+        <label>Departamento</label>
+        <input type="text" id="np-departamento" placeholder="LIMA">
+      </div>
+      <div class="field">
+        <label>Ciudad</label>
+        <input type="text" id="np-ciudad" placeholder="Lima">
+      </div>
+      <div class="field">
+        <label>Banco</label>
+        <select id="np-banco">
+          <option value="">Seleccionar...</option>
+          <option>BCP</option>
+          <option>INTERBANK</option>
+          <option>BBVA</option>
+          <option>SCOTIABANK</option>
+          <option>BN</option>
+          <option>BANBIF</option>
+          <option>CAJA PIURA</option>
+          <option>OTRO</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>N° Cuenta</label>
+        <input type="text" id="np-cuenta" placeholder="Número de cuenta">
+      </div>
+      <div class="field span-2">
+        <label>N° CCI (Interbancario)</label>
+        <input type="text" id="np-cci" placeholder="Código de cuenta interbancario">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="cerrarModalNuevaPersona()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarNuevaPersona()">Guardar en BBDD</button>
+    </div>
+  </div>
+</div>
+
+
 
 <script>
 // ── FETCH VIA JSONP (evita CORS en Apps Script) ──
@@ -2129,6 +2197,16 @@ async function cargarProyectos() {
     const selSup = document.getElementById('f-supervisor');
     if (selSup) selSup.innerHTML = '<option value="">Primero elige proyecto...</option>';
 
+    // Llenar select Ejecutivo de Cuentas con todos los ejecutivos únicos
+    const selEj = document.getElementById('f-ej-cuentas');
+    if (selEj && window._proyectosRaw) {
+      const allEjs = [...new Set(
+        window._proyectosRaw.filter(p => p.ejCuentas).map(p => p.ejCuentas.trim())
+      )].sort();
+      selEj.innerHTML = '<option value="">Seleccionar...</option>';
+      allEjs.forEach(ej => { selEj.innerHTML += `<option value="${ej}">${ej}</option>`; });
+    }
+
     // Llenar también selects del panel Exportar si ya están en DOM
     const expCli = document.getElementById('exp-cliente');
     if (expCli) {
@@ -2182,13 +2260,30 @@ function filterSupervisores() {
   if (sups.length === 1) selSup.value = sups[0]; // autoselect si hay solo uno
 
   // Autocompletar Ejecutivo de Cuentas según cliente+proyecto
-  const ejInput = document.getElementById('f-ej-cuentas');
-  if (ejInput && window._proyectosRaw) {
+  const ejSel = document.getElementById('f-ej-cuentas');
+  if (ejSel && window._proyectosRaw) {
+    // Obtener ejecutivos únicos de todos los proyectos activos
+    const allEjs = [...new Set(
+      window._proyectosRaw
+        .filter(p => p.ejCuentas)
+        .map(p => p.ejCuentas.trim())
+    )].sort();
+    // Guardar selección actual
+    const prevVal = ejSel.value;
+    ejSel.innerHTML = '<option value="">Seleccionar...</option>';
+    allEjs.forEach(ej => {
+      ejSel.innerHTML += `<option value="${ej}">${ej}</option>`;
+    });
+    // Si el proyecto tiene un ejecutivo específico, autoseleccionar
     const match = window._proyectosRaw.find(p =>
       (p.cliente||'').toUpperCase() === cliente.toUpperCase() &&
       (p.proyecto||'').toUpperCase() === proyecto.toUpperCase()
     );
-    ejInput.value = match ? (match.ejCuentas || '') : '';
+    if (match && match.ejCuentas) {
+      ejSel.value = match.ejCuentas;
+    } else if (prevVal) {
+      ejSel.value = prevVal;
+    }
   }
 }
 
@@ -2210,7 +2305,11 @@ async function buscarDNI() {
         showToast('✓ Trabajador encontrado');
         return;
       } else {
-        showToast('DNI no encontrado en la BBDD', true); return;
+        showToast('DNI no encontrado — puedes agregarlo a la BBDD', true);
+        // Pre-llenar el DNI en el modal de nueva persona
+        document.getElementById('np-dni').value = dni;
+        document.getElementById('modal-nueva-persona').style.display = 'flex';
+        return;
       }
     } catch(e) { showToast('Error al conectar con Google Sheets', true); return; }
   }
@@ -2285,7 +2384,7 @@ async function guardarRegistro() {
     if (!ok) return;
   }
 
-  const totalStr = document.getElementById('f-total').textContent.replace('S/. ','');
+  const totalStr = parseFloat(document.getElementById('f-total').textContent.replace('S/. ','').replace(/,/g,'')) || 0;
   const dias     = parseFloat(document.getElementById('f-dias').value) || 0;
   const pagoDia  = parseFloat(document.getElementById('f-pago-dia').value) || 0;
   const movDia   = parseFloat(document.getElementById('f-movilidad-diaria').value) || 0;
@@ -3105,6 +3204,63 @@ function verDetalle(id) {
 function cerrarModal(id) {
   document.getElementById(id).classList.remove('open');
 }
+
+// ── NUEVA PERSONA EN BBDD ──
+function abrirModalNuevaPersona() {
+  // Pre-llenar DNI si ya hay uno escrito
+  const dni = document.getElementById('f-dni').value.trim();
+  if (dni) document.getElementById('np-dni').value = dni;
+  document.getElementById('modal-nueva-persona').style.display = 'flex';
+}
+
+function cerrarModalNuevaPersona() {
+  document.getElementById('modal-nueva-persona').style.display = 'none';
+  ['np-nombre','np-dni','np-departamento','np-ciudad','np-banco','np-cuenta','np-cci'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+}
+
+async function guardarNuevaPersona() {
+  const nombre = document.getElementById('np-nombre').value.trim().toUpperCase();
+  const dni    = document.getElementById('np-dni').value.trim();
+  if (!nombre || !dni || dni.length !== 8) {
+    showToast('Nombre y DNI (8 dígitos) son obligatorios', true); return;
+  }
+  const payload = {
+    accion:       'agregarPersona',
+    nombre:       nombre,
+    dni:          dni,
+    departamento: document.getElementById('np-departamento').value.trim().toUpperCase(),
+    ciudad:       document.getElementById('np-ciudad').value.trim(),
+    banco:        document.getElementById('np-banco').value,
+    cuenta:       document.getElementById('np-cuenta').value.trim(),
+    cci:          document.getElementById('np-cci').value.trim(),
+  };
+
+  if (!SCRIPT_URL) { showToast('Configura el Apps Script primero', true); return; }
+
+  try {
+    const params = new URLSearchParams();
+    params.append('data', JSON.stringify(payload));
+    await fetch(SCRIPT_URL, { method:'POST', body: params, mode:'no-cors' });
+
+    showToast('✓ Persona agregada a la BBDD');
+    // Auto-llenar el formulario con los datos recién ingresados
+    document.getElementById('f-nombre').value       = nombre;
+    document.getElementById('f-dni').value          = dni;
+    document.getElementById('f-departamento').value = payload.departamento;
+    document.getElementById('f-ciudad').value       = payload.ciudad;
+    document.getElementById('f-banco').value        = payload.banco;
+    document.getElementById('f-cuenta').value       = payload.cuenta;
+    document.getElementById('f-cci').value          = payload.cci;
+    cerrarModalNuevaPersona();
+  } catch(e) {
+    showToast('Error al guardar — intenta de nuevo', true);
+  }
+}
+
+
 
 // click outside to close
 document.querySelectorAll('.modal-overlay').forEach(m => {
@@ -4022,7 +4178,7 @@ async function procesarExcelCarga(file) {
 
   cargaFilas = [];
   for (const row of rows) {
-    const [, quincena, cliente, proyecto, supervisor, ejCuentas, dni,
+    const [quincena, cliente, proyecto, supervisor, ejCuentas, dni,
            dias, pagoDia, movDia, movAd, movVi, adelanto, megas, otros] = row;
 
     const diasN    = parseFloat(dias)    || 0;
@@ -4193,7 +4349,7 @@ async function confirmarCargaMasiva() {
       pagoDias: f.pagoDias, movilidadDia: f.movilidadDia, movilidad: f.movilidad,
       movAdicional: f.movAdicional, movViajera: f.movViajera,
       adelanto: f.adelanto, megas: f.megas, otros: f.otros,
-      total: f.total, rxh: 'No — pendiente', fechaRxh: '', numRxh: '', emisor: '', fechaAbono: ''
+      total: parseFloat(f.total) || 0, rxh: 'No — pendiente', fechaRxh: '', numRxh: '', emisor: '', fechaAbono: ''
     };
 
     if (SCRIPT_URL) {
