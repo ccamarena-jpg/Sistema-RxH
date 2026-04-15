@@ -379,6 +379,8 @@
   .act-observe:hover { background: var(--red); color: #fff; }
   .act-view { background: var(--surface2); color: var(--text-muted); }
   .act-view:hover { color: var(--text); }
+  .act-revert { background: rgba(120,80,200,0.15); color: #7850c8; border: 1px solid rgba(120,80,200,0.3); }
+  .act-revert:hover { background: rgba(120,80,200,0.3); color: #5a3aaa; }
 
   /* ── STATS CARDS ── */
   .stats-row {
@@ -1768,6 +1770,12 @@ function doGet(e) {
       sheet.getRange(fila, 27).setValue(e.parameter.numRxh || '');  // AA: # Recibo (legible)
       sheet.getRange(fila, 28).setValue(e.parameter.rxh || '');     // AB: Detalle completo
       sheet.getRange(fila, 30).setValue(nuevoEstado);               // AD: Estado
+    } else if (tipo === 'revertir-contabilidad') {
+      // Revertir aprobación de Contabilidad → vuelve a OBSERVADO-CONTABILIDAD
+      sheet.getRange(fila, 30).setValue('OBSERVADO-CONTABILIDAD');  // AD: estado
+      sheet.getRange(fila, 34).setValue(obs);                       // AH: obs contabilidad
+      sheet.getRange(fila, 35).setValue(new Date());                // AI: fecha reversion
+      sheet.getRange(fila, 36).setValue('No');                      // AJ: aprobado cont → No
     } else {
       sheet.getRange(fila, 30).setValue(nuevoEstado);               // AD: estado
       sheet.getRange(fila, 34).setValue(obs);                       // AH: obs contabilidad
@@ -3189,6 +3197,9 @@ function renderTablaContabilidad() {
               <button class="act-btn act-approve" onclick="aprobarContabilidad(${r.id})">Validar</button>
               <button class="act-btn act-observe" onclick="abrirObservacion(${r.id},'contabilidad')">Observar</button>
             ` : ''}
+            ${r.estado === 'PAGADO' ? `
+              <button class="act-btn act-revert" onclick="revertirContabilidad(${r.id})" title="Revertir aprobación">↩ Revertir</button>
+            ` : ''}
             <button class="act-btn act-view" onclick="verDetalle(${r.id})">Ver</button>
           </div>
           ${r.obsCont ? `<div style="font-size:11px;color:var(--orange);margin-top:6px;display:flex;align-items:flex-start;gap:4px"><span>⚠</span><span>${r.obsCont}</span></div>` : ''}
@@ -3215,6 +3226,22 @@ async function aprobarContabilidad(id) {
     fetchScript({accion:'actualizar', fila:r.fila, tipo:'contabilidad', estado:'PAGADO'});
     // Notificar al supervisor que su registro fue pagado
     notificarPorEmail('pagado', r, Object.keys(SUPERVISORES_MAP).find(k => SUPERVISORES_MAP[k] === r.supervisor) || '');
+  }
+}
+
+async function revertirContabilidad(id) {
+  const r = registros.find(x=>x.id===id);
+  if (!r) return;
+  if (!confirm(`¿Revertir la aprobación de "${r.nombre}"?\nEl registro volverá a estado "Observado-Contabilidad" para que pueda corregirse.`)) return;
+  r.estado = 'OBSERVADO-CONTABILIDAD';
+  r.obsContabilidad = r.obsContabilidad || 'Aprobación revertida — pendiente corrección';
+  renderTablaContabilidad();
+  showToast('↩ Aprobación revertida a Observado-Contabilidad');
+  if (SCRIPT_URL) {
+    fetchScript({accion:'actualizar', fila:r.fila, tipo:'revertir-contabilidad',
+      estado:'OBSERVADO-CONTABILIDAD',
+      obs: r.obsContabilidad
+    });
   }
 }
 
