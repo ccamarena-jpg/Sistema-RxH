@@ -1,0 +1,16 @@
+# Vercel
+.vercel
+
+# Node (por si en el futuro se agregan dependencias)
+node_modules/
+npm-debug.log*
+
+# Sistema / editores
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+.vscode/
+
+# Temporales de OneDrive
+~$*
