@@ -18,7 +18,7 @@ var DOMINIO   = 'ttaudit.com';
 
 // Devuelve el email (minúsculas) si el token es de un usuario @ttaudit.com válido; si no, null.
 function verificar_(token) {
-  if (!token) return null;
+  if (!token) { Logger.log('verificar_: SIN token'); return null; }
   var cache = CacheService.getScriptCache();
   var key = 'tok_' + Utilities.base64EncodeWebSafe(
     Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token)
@@ -30,16 +30,36 @@ function verificar_(token) {
       'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token),
       { muteHttpExceptions: true }
     );
-    if (resp.getResponseCode() !== 200) return null;
+    var code = resp.getResponseCode();
+    if (code !== 200) {
+      Logger.log('verificar_: tokeninfo code=' + code + ' body=' + resp.getContentText().slice(0, 200));
+      return null;
+    }
     var info = JSON.parse(resp.getContentText());
-    if (info.aud !== CLIENT_ID) return null;
-    if (String(info.email_verified) !== 'true') return null;
+    // aud puede venir como string; comparar contra el client_id esperado
+    if (String(info.aud) !== CLIENT_ID) {
+      Logger.log('verificar_: aud NO coincide. recibido=' + info.aud + ' esperado=' + CLIENT_ID);
+      return null;
+    }
+    // email_verified: solo rechazar si es explícitamente false (Workspace a veces no lo manda)
+    if (String(info.email_verified) === 'false') {
+      Logger.log('verificar_: email_verified=false');
+      return null;
+    }
     var email = String(info.email || '').toLowerCase();
-    if (email.slice(-(DOMINIO.length + 1)) !== '@' + DOMINIO) return null;
-    if (info.exp && (parseInt(info.exp, 10) * 1000) < Date.now()) return null;
+    if (email.slice(-(DOMINIO.length + 1)) !== '@' + DOMINIO) {
+      Logger.log('verificar_: dominio no permitido, email=' + email);
+      return null;
+    }
+    if (info.exp && (parseInt(info.exp, 10) * 1000) < Date.now()) {
+      Logger.log('verificar_: token expirado exp=' + info.exp);
+      return null;
+    }
     cache.put(key, email, 300); // cachear 5 min para bajar latencia
+    Logger.log('verificar_: OK ' + email);
     return email;
   } catch (err) {
+    Logger.log('verificar_: EXCEPCION ' + err);
     return null;
   }
 }
