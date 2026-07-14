@@ -61,6 +61,21 @@ function configurarHoja() {
   asegurarHeaderDiasDetalle_();
 }
 
+// ⚙️ EJECUTA ESTA FUNCIÓN UNA VEZ desde el editor (selecciónala y pulsa ▶ Ejecutar).
+// Sirve para AUTORIZAR el permiso de "solicitudes externas" (UrlFetchApp) que necesita
+// el login, y para confirmar que la validación del token funciona.
+// Al terminar, en "Registro de ejecución" (abajo) debe decir: "UrlFetchApp OK — código: 400".
+function probarPermisos() {
+  var r = UrlFetchApp.fetch(
+    'https://oauth2.googleapis.com/tokeninfo?id_token=prueba',
+    { muteHttpExceptions: true }
+  );
+  Logger.log('UrlFetchApp OK — código: ' + r.getResponseCode());
+  asegurarHeaderDiasDetalle_();
+  Logger.log('Hoja OK — encabezado AL verificado');
+  return 'OK';
+}
+
 
 function doPost(e) {
   var data = JSON.parse(e.parameter.data || e.postData.contents);
