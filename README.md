@@ -60,9 +60,11 @@ El orden importa para no romper la app en producción:
 
 ### Calendario de asistencia (columna nueva)
 
-El backend nuevo agrega la columna **AL "DIAS DETALLE"** en la hoja `REGISTROS`,
-donde se guarda el patrón de días trabajados (ej. `1:1,2:0.5,15:1`). Al redesplegar
-`apps-script.gs`, agrega ese encabezado en la columna AL de la hoja. La pestaña
+El backend nuevo usa la columna **AL "DIAS DETALLE"** en la hoja `REGISTROS`,
+donde se guarda el patrón de días trabajados (ej. `1:1,2:0.5,15:1`). El encabezado
+se crea **automáticamente** (`asegurarHeaderDiasDetalle_`) al guardar o leer registros;
+también puedes ejecutar la función `configurarHoja()` una vez desde el editor de Apps
+Script para crearlo de inmediato. La pestaña
 **Asistencia** muestra el calendario por quincena (con filtros de ejecutivo, cliente,
 proyecto y supervisor); el supervisor marca los días al registrar y se autocompletan
 los "Días trabajados" (soporta medio día = ½).

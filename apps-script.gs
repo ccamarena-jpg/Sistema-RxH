@@ -45,6 +45,23 @@ function verificar_(token) {
 }
 
 
+// Crea el encabezado AL "DIAS DETALLE" si aún no existe (idempotente y barato).
+function asegurarHeaderDiasDetalle_() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('REGISTROS');
+  if (!sheet) return;
+  var cell = sheet.getRange(1, 38); // AL1
+  if (String(cell.getValue()).trim() === '') {
+    cell.setValue('DIAS DETALLE');
+  }
+}
+
+// Puedes ejecutar esta función UNA vez desde el editor (botón Ejecutar) para
+// crear el encabezado de inmediato, sin esperar al primer uso de la app.
+function configurarHoja() {
+  asegurarHeaderDiasDetalle_();
+}
+
+
 function doPost(e) {
   var data = JSON.parse(e.parameter.data || e.postData.contents);
 
@@ -74,6 +91,7 @@ function doPost(e) {
 
   // ── GUARDAR REGISTRO ──
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('REGISTROS');
+  asegurarHeaderDiasDetalle_(); // crea el encabezado AL si falta
 
   sheet.appendRow([
     new Date(),                    // A: FECHA DE REGISTRO
@@ -246,6 +264,7 @@ function doGet(e) {
 
   // ── OBTENER REGISTROS ──
   if (accion === 'registros') {
+    asegurarHeaderDiasDetalle_(); // crea el encabezado AL si falta
     var sheet   = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('REGISTROS');
     var rows    = sheet.getDataRange().getValues();
     var headers = rows[0];
