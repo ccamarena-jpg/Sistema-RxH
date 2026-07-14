@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd",
+            "args": [
+              "/c",
+              "C:\\Users\\User\\OneDrive - TRADITIONAL TRADE AUDIT S.A.C\\RRHH\\01. PLANILLA\\PLATAFORMA RxH\\git-autopush.bat"
+            ],
+            "timeout": 120,
+            "statusMessage": "Publicando cambios en GitHub..."
+          }
+        ]
+      }
+    ]
+  }
+}
