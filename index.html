@@ -653,7 +653,7 @@
     <button class="tab-btn tab-admin" onclick="switchTab('aprobacion')">Cuentas</button>
     <button class="tab-btn tab-admin" onclick="switchTab('contabilidad')">Contabilidad</button>
     <button class="tab-btn tab-admin" onclick="switchTab('dashboard')">Dashboard</button>
-    <button class="tab-btn tab-admin" onclick="switchTab('exportar')">Exportar</button>
+    <button class="tab-btn tab-admin" onclick="switchTab('exportar')">Exportar RxH</button>
     <button class="tab-btn" id="btn-config" onclick="pedirClave()">⚙</button>
     <div style="display:flex;align-items:center;gap:8px;margin-left:auto;padding-left:16px">
       <span id="user-badge" style="
@@ -1316,8 +1316,8 @@
 <div id="panel-exportar" class="panel">
 <div class="form-wrap">
   <div class="section-header">
-    <h1>Exportar reporte de pagos</h1>
-    <p>Genera el archivo Excel listo para el banco con los registros aprobados por Contabilidad.</p>
+    <h1>Exportar RxH</h1>
+    <p>Genera el archivo Excel listo para el banco con los registros aprobados por Contabilidad, incluyendo N° de recibo y emisor.</p>
   </div>
 
   <div class="form-card">
@@ -1368,6 +1368,7 @@
           <th>Monto Total</th>
           <th>Banco</th>
           <th>N° Recibo</th>
+          <th>Emisor RxH</th>
         </tr>
       </thead>
       <tbody id="exp-tbody"></tbody>
@@ -3414,26 +3415,42 @@ function confirmarObservacion() {
 
 function verDetalle(id) {
   const r = registros.find(x=>x.id===id);
+  // Formateo seguro de montos (nunca "undefined")
+  const fmt  = n => 'S/. ' + (Number(n) || 0).toFixed(2);
+  const dias = parsearTotal(r.dias);
+  // Honorarios = pago por días trabajados. El backend a veces no lo manda:
+  // usar el valor si viene, o calcularlo como días × pago/día.
+  let honorarios = parsearTotal(r.pagoDias) || parsearTotal(r.honorarios);
+  if (!honorarios) honorarios = dias * parsearTotal(r.pagoDia);
+  // Movilidad base = días × movilidad diaria (o el valor calculado si viene)
+  let movBase = parsearTotal(r.movilidad);
+  if (!movBase) movBase = dias * parsearTotal(r.movilidadDia);
+  // Emisor(es) del RxH — mismo parseo que la tabla de RxH
+  const emisores = (r.numRxh||'').split('|').map(x => (x.split('::')[3]||'').trim()).filter(Boolean).join(', ');
   document.getElementById('modal-det-title').textContent = r.nombre;
   document.getElementById('modal-det-content').innerHTML = `
     <table style="width:100%;border-collapse:collapse">
       ${[
-        ['Quincena', r.quincena || 'Q1-FEB-2026'],
+        ['Quincena', r.quincena || '—'],
         ['Cliente', r.cliente],
         ['Proyecto', r.proyecto],
         ['Ciudad', r.ciudad],
         ['DNI', r.dni],
         ['Banco', r.banco],
-        ['N° Cuenta', r.cuenta],
-        ['N° CCI', r.cci],
-        ['Días', r.dias],
-        ['Honorarios', 'S/. ' + r.honorarios],
-        ['Movilidad base', 'S/. ' + r.movilidad],
-        ['Mov. adicional', 'S/. ' + (r.movAdicional||0)],
-        ['Megas', 'S/. ' + (r.megas||0)],
-        ['Total', 'S/. ' + r.total],
+        ['N° Cuenta', r.cuenta || '—'],
+        ['N° CCI', r.cci || '—'],
+        ['Días trabajados', r.dias || '0'],
+        ['Honorarios', fmt(honorarios)],
+        ['Movilidad base', fmt(movBase)],
+        ['Mov. adicional', fmt(r.movAdicional)],
+        ['Mov. viajera', fmt(r.movViajera)],
+        ['Megas / internet', fmt(r.megas)],
+        ['Otros conceptos', fmt(r.otros)],
+        ['Adelanto', fmt(r.adelanto)],
+        ['Total a pagar', fmt(r.total)],
         ['RxH', r.rxh],
-        ['N° RxH', r.numRxh || '—'],
+        ['N° RxH', (r.numRxh||'').split('|').map(x=>x.split('::')[0].trim()).filter(Boolean).join(', ') || '—'],
+        ['Emisor RxH', emisores || '—'],
         ['Estado', r.estado],
       ].map(([k,v]) => `
         <tr>
@@ -3883,6 +3900,8 @@ function previsualizarReporte() {
     const cciLimpia    = String(r.cci   ||'').replace(/\.0+$/,'').trim();
     // Mostrar todos los números de recibo separados por coma
     const recibos = (r.numRxh||'').split('|').map(x => x.split('::')[0].trim()).filter(Boolean).join(', ');
+    // Emisor(es) del RxH — mismo parseo que la tabla de RxH (num::fecha::monto::emisor)
+    const emisores = (r.numRxh||'').split('|').map(x => (x.split('::')[3]||'').trim()).filter(Boolean).join(', ');
     return `<tr>
       <td style="color:var(--text-dim)">${i+1}</td>
       <td><strong>${r.nombre}</strong></td>
@@ -3896,6 +3915,7 @@ function previsualizarReporte() {
       <td style="font-weight:600;color:var(--navy)">S/. ${parsearTotal(r.total).toLocaleString('es-PE',{minimumFractionDigits:2})}</td>
       <td>${r.banco}</td>
       <td style="font-size:12px">${recibos || '<span style="color:var(--orange)">Pendiente</span>'}</td>
+      <td style="font-size:12px">${emisores || '—'}</td>
     </tr>`;
   }).join('');
 
@@ -3915,13 +3935,14 @@ function exportarExcel() {
   const headers = [
     'N°','APELLIDOS Y NOMBRE','DNI','TIPO DE ABONO',
     'TIPO DE CUENTA','MONEDA DE CUENTA','N° CUENTA BANCARIA','N° CUENTA INTERBANCARIA (CCI)',
-    'MONEDA DE ABONO','MONTO TOTAL','BANCO','PROYECTO','QUINCENA','N° RECIBO'
+    'MONEDA DE ABONO','MONTO TOTAL','BANCO','PROYECTO','QUINCENA','N° RECIBO','EMISOR RXH'
   ];
 
   const rows = lista.map((r,i) => {
     const cuentaLimpia = String(r.cuenta||'').replace(/\.0+$/,'').trim();
     const cciLimpia    = String(r.cci   ||'').replace(/\.0+$/,'').trim();
     const recibos      = (r.numRxh||'').split('|').map(x=>x.split('::')[0].trim()).filter(Boolean).join(', ');
+    const emisores     = (r.numRxh||'').split('|').map(x=>(x.split('::')[3]||'').trim()).filter(Boolean).join(', ');
     return [
       i+1,
       r.nombre,
@@ -3936,7 +3957,8 @@ function exportarExcel() {
       r.banco,
       r.proyecto,
       r.quincena,
-      recibos
+      recibos,
+      emisores
     ];
   });
 
