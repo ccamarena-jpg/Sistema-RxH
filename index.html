@@ -652,6 +652,7 @@
     <!-- ADMIN/SUPERADMIN tabs -->
     <button class="tab-btn tab-admin" onclick="switchTab('aprobacion')">Cuentas</button>
     <button class="tab-btn tab-admin" onclick="switchTab('contabilidad')">Contabilidad</button>
+    <button class="tab-btn tab-admin" onclick="switchTab('asistencia')">Asistencia</button>
     <button class="tab-btn tab-admin" onclick="switchTab('dashboard')">Dashboard</button>
     <button class="tab-btn tab-admin" onclick="switchTab('exportar')">Exportar RxH</button>
     <button class="tab-btn" id="btn-config" onclick="pedirClave()">⚙</button>
@@ -688,7 +689,7 @@
     <div class="form-grid cols-3">
       <div class="field">
         <label>Quincena</label>
-        <select id="f-quincena">
+        <select id="f-quincena" onchange="renderAsistenciaForm()">
           <option value="">Seleccionar...</option>
           <option>Q1-ENE-2026</option><option>Q2-ENE-2026</option>
           <option>Q1-FEB-2026</option><option>Q2-FEB-2026</option>
@@ -780,6 +781,17 @@
         <div id="f-cci-error" style="display:none;font-size:11px;color:var(--red);margin-top:4px">⚠ Debe tener exactamente 20 dígitos</div>
       </div>
     </div>
+  </div>
+
+  <!-- Asistencia: calendario de días trabajados -->
+  <div class="form-card">
+    <div class="form-card-title">🗓 Asistencia — marca los días trabajados</div>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">
+      Elige la quincena arriba y haz clic en cada día: 1 clic = día completo, 2 clics = medio día (½), 3 clics = borrar.
+      El campo "Días trabajados" se calcula solo.
+    </p>
+    <div id="f-asistencia-grid" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+    <div id="f-asistencia-resumen" style="margin-top:10px;font-size:13px;color:var(--navy);font-weight:600"></div>
   </div>
 
   <!-- Conceptos de pago -->
@@ -1381,6 +1393,46 @@
   </div>
 </div>
 </div><!-- /panel-exportar -->
+
+<!-- ══════════════════════════════════════════════════════════
+     PANEL: ASISTENCIA (calendario de días trabajados)
+════════════════════════════════════════════════════════════ -->
+<div id="panel-asistencia" class="panel">
+<div class="form-wrap">
+  <div class="section-header">
+    <h1>Asistencia del personal</h1>
+    <p>Visualiza los días trabajados por cada persona en la quincena. Los marca el supervisor al registrar el pago.</p>
+  </div>
+
+  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;align-items:flex-end">
+    <div class="field" style="margin:0;min-width:150px">
+      <label style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Quincena</label>
+      <select id="asis-fil-quincena" onchange="renderAsistencia()" style="width:100%;padding:7px 12px;border-radius:6px;border:1px solid var(--border);font-size:13px;background:#fff;color:var(--text)"><option value="">Seleccionar...</option></select>
+    </div>
+    <div class="field" style="margin:0;min-width:160px">
+      <label style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Ejecutivo Cuentas</label>
+      <select id="asis-fil-ejcuentas" onchange="renderAsistencia()" style="width:100%;padding:7px 12px;border-radius:6px;border:1px solid var(--border);font-size:13px;background:#fff;color:var(--text)"><option value="">Todos</option></select>
+    </div>
+    <div class="field" style="margin:0;min-width:140px">
+      <label style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Cliente</label>
+      <select id="asis-fil-cliente" onchange="renderAsistencia()" style="width:100%;padding:7px 12px;border-radius:6px;border:1px solid var(--border);font-size:13px;background:#fff;color:var(--text)"><option value="">Todos</option></select>
+    </div>
+    <div class="field" style="margin:0;min-width:160px">
+      <label style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Proyecto</label>
+      <select id="asis-fil-proyecto" onchange="renderAsistencia()" style="width:100%;padding:7px 12px;border-radius:6px;border:1px solid var(--border);font-size:13px;background:#fff;color:var(--text)"><option value="">Todos</option></select>
+    </div>
+    <div class="field" style="margin:0;min-width:140px">
+      <label style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Supervisor</label>
+      <select id="asis-fil-supervisor" onchange="renderAsistencia()" style="width:100%;padding:7px 12px;border-radius:6px;border:1px solid var(--border);font-size:13px;background:#fff;color:var(--text)"><option value="">Todos</option></select>
+    </div>
+    <button class="btn btn-ghost" onclick="limpiarFiltrosAsistencia()">✕ Limpiar</button>
+  </div>
+
+  <div class="form-card">
+    <div id="asis-tabla-wrap" style="overflow-x:auto"></div>
+  </div>
+</div>
+</div><!-- /panel-asistencia -->
 
 <!-- ══════════════════════════════════════════════════════════
      PANEL: CARGA MASIVA
@@ -2259,6 +2311,9 @@ function switchTab(tab) {
   if (tab === 'dashboard') {
     cargarRegistrosDesdeSheets().then(() => renderDashboard());
   }
+  if (tab === 'asistencia') {
+    cargarRegistrosDesdeSheets().then(() => renderAsistencia());
+  }
   if (tab === 'configuracion') cargarConfig();
 }
 
@@ -2624,6 +2679,7 @@ async function guardarRegistro() {
     megas:         parseFloat(document.getElementById('f-megas').value) || 0,
     otros:         parseFloat(document.getElementById('f-otros').value) || 0,
     total:         totalStr,
+    diasDetalle:   serializarAsistencia(),
     rxh:           'No — pendiente',
     fechaRxh:      '',
     numRxh:        '',
@@ -2677,6 +2733,9 @@ function limpiarFormulario() {
   document.getElementById('f-pago-dias').value = '';
   document.getElementById('f-movilidad').value = '';
   document.getElementById('f-total').textContent = 'S/. 0.00';
+  // Reset del calendario de asistencia
+  asistenciaForm = {};
+  renderAsistenciaForm();
 }
 
 // ── TABLA CUENTAS ──
@@ -3465,6 +3524,189 @@ function verDetalle(id) {
 
 function cerrarModal(id) {
   document.getElementById(id).classList.remove('open');
+}
+
+// ══════════════════════════════════════════════════════════
+//  ASISTENCIA — calendario de días trabajados
+// ══════════════════════════════════════════════════════════
+
+// Devuelve los días calendario de una quincena. Q1 = 1..15, Q2 = 16..fin de mes.
+function diasDeQuincena(q) {
+  const M = {ENE:0,FEB:1,MAR:2,ABR:3,MAY:4,JUN:5,JUL:6,AGO:7,SEP:8,SET:8,OCT:9,NOV:10,DIC:11};
+  const m = String(q||'').toUpperCase().match(/Q([12])-([A-Z]{3,4})-(\d{4})/);
+  if (!m) return { dias: [] };
+  const quinc = +m[1], mes = M[m[2].slice(0,3)], anio = +m[3];
+  if (mes === undefined) return { dias: [] };
+  const ultimo = new Date(anio, mes + 1, 0).getDate();
+  const from = quinc === 1 ? 1 : 16;
+  const to   = quinc === 1 ? 15 : ultimo;
+  const dias = [];
+  for (let d = from; d <= to; d++) dias.push(d);
+  return { dias, mes, anio, quinc };
+}
+
+// "1:1,2:0.5,15:1" → { 1:1, 2:0.5, 15:1 }
+function parseAsistencia(s) {
+  const o = {};
+  String(s||'').split(',').forEach(p => {
+    const kv = p.split(':');
+    if (kv[0] !== '' && kv[0] !== undefined) o[+kv[0]] = parseFloat(kv[1]) || 0;
+  });
+  return o;
+}
+
+// ── Grilla en el formulario de Nuevo Registro ──
+let asistenciaForm = {}; // { dia: 1 | 0.5 }
+
+function renderAsistenciaForm() {
+  const cont = document.getElementById('f-asistencia-grid');
+  if (!cont) return;
+  const resumen = document.getElementById('f-asistencia-resumen');
+  const q = document.getElementById('f-quincena').value;
+  asistenciaForm = {};
+  const info = diasDeQuincena(q);
+  if (!info.dias.length) {
+    cont.innerHTML = '<span style="color:var(--text-dim);font-size:12px">Selecciona una quincena para marcar los días.</span>';
+    if (resumen) resumen.textContent = '';
+    return;
+  }
+  cont.innerHTML = info.dias.map(d => `
+    <button type="button" class="asis-day" data-dia="${d}" onclick="toggleAsisDia(${d})"
+      style="width:42px;height:46px;border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+      <span class="asis-num" style="font-weight:600;font-size:12px;color:var(--text-muted)">${d}</span>
+      <span class="asis-val" style="font-size:11px;color:var(--text-dim)">—</span>
+    </button>`).join('');
+  actualizarAsisResumen();
+}
+
+function toggleAsisDia(d) {
+  const cur = asistenciaForm[d];
+  let next;
+  if (cur === undefined) next = 1;
+  else if (cur === 1) next = 0.5;
+  else next = undefined;
+  if (next === undefined) delete asistenciaForm[d]; else asistenciaForm[d] = next;
+
+  const btn = document.querySelector('.asis-day[data-dia="' + d + '"]');
+  if (btn) {
+    const num = btn.querySelector('.asis-num');
+    const val = btn.querySelector('.asis-val');
+    if (next === 1) {
+      btn.style.background = 'var(--navy)'; num.style.color = '#fff'; val.style.color = '#fff'; val.textContent = '1';
+    } else if (next === 0.5) {
+      btn.style.background = 'var(--accent)'; num.style.color = '#fff'; val.style.color = '#fff'; val.textContent = '½';
+    } else {
+      btn.style.background = '#fff'; num.style.color = 'var(--text-muted)'; val.style.color = 'var(--text-dim)'; val.textContent = '—';
+    }
+  }
+  actualizarAsisResumen();
+}
+
+function actualizarAsisResumen() {
+  const total = Object.values(asistenciaForm).reduce((s, v) => s + v, 0);
+  const resumen = document.getElementById('f-asistencia-resumen');
+  if (resumen) resumen.textContent = 'Días marcados: ' + total;
+  // Autocompletar "Días trabajados" solo si se marcó algo en la grilla
+  const fdias = document.getElementById('f-dias');
+  if (fdias && Object.keys(asistenciaForm).length) {
+    fdias.value = total;
+    calcularTotal();
+  }
+}
+
+function serializarAsistencia() {
+  return Object.keys(asistenciaForm)
+    .sort((a, b) => a - b)
+    .map(d => d + ':' + asistenciaForm[d])
+    .join(',');
+}
+
+// ── Vista de calendario (gerentes / ejecutivos) ──
+function _valAsis(id) { const el = document.getElementById(id); return el ? el.value : ''; }
+
+function poblarFiltrosAsistencia() {
+  const uniq = campo => [...new Set(registros.map(r => r[campo]).filter(Boolean))].sort();
+  const sets = {
+    'asis-fil-quincena':   uniq('quincena'),
+    'asis-fil-ejcuentas':  uniq('ejCuentas'),
+    'asis-fil-cliente':    uniq('cliente'),
+    'asis-fil-proyecto':   uniq('proyecto'),
+    'asis-fil-supervisor': uniq('supervisor'),
+  };
+  Object.keys(sets).forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const prev = el.value;
+    const primera = id === 'asis-fil-quincena' ? 'Seleccionar...' : 'Todos';
+    el.innerHTML = '<option value="">' + primera + '</option>' +
+      sets[id].map(v => `<option ${v === prev ? 'selected' : ''}>${v}</option>`).join('');
+  });
+}
+
+function limpiarFiltrosAsistencia() {
+  ['asis-fil-ejcuentas','asis-fil-cliente','asis-fil-proyecto','asis-fil-supervisor']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  renderAsistencia();
+}
+
+function renderAsistencia() {
+  poblarFiltrosAsistencia();
+  const wrap = document.getElementById('asis-tabla-wrap');
+  if (!wrap) return;
+  const q  = _valAsis('asis-fil-quincena');
+  const ej = _valAsis('asis-fil-ejcuentas');
+  const cl = _valAsis('asis-fil-cliente');
+  const pr = _valAsis('asis-fil-proyecto');
+  const su = _valAsis('asis-fil-supervisor');
+
+  if (!q) {
+    wrap.innerHTML = '<p style="color:var(--text-dim);padding:24px;text-align:center">Selecciona una quincena para ver el calendario de días trabajados.</p>';
+    return;
+  }
+
+  let lista = registros.filter(r => r.quincena === q
+    && (!ej || r.ejCuentas === ej)
+    && (!cl || r.cliente === cl)
+    && (!pr || r.proyecto === pr)
+    && (!su || r.supervisor === su));
+
+  if (!lista.length) {
+    wrap.innerHTML = '<p style="color:var(--text-dim);padding:24px;text-align:center">Sin registros para ese filtro.</p>';
+    return;
+  }
+
+  const info = diasDeQuincena(q);
+  const head = '<th style="text-align:left">Trabajador</th><th style="text-align:left">Proyecto</th>'
+    + info.dias.map(d => `<th style="text-align:center;min-width:26px">${d}</th>`).join('')
+    + '<th style="text-align:center">Total</th>';
+
+  const body = lista.map(r => {
+    const pat = parseAsistencia(r.diasDetalle);
+    const tieneP = Object.keys(pat).length > 0;
+    let tot = 0;
+    const cells = info.dias.map(d => {
+      const v = pat[d];
+      if (v === 1)   { tot += 1;   return '<td style="text-align:center;background:rgba(26,58,107,0.12);color:var(--navy);font-weight:700">●</td>'; }
+      if (v === 0.5) { tot += 0.5; return '<td style="text-align:center;background:rgba(240,194,48,0.30);color:var(--accent2);font-weight:700">½</td>'; }
+      return '<td style="text-align:center;color:var(--text-dim)">·</td>';
+    }).join('');
+    // Si el registro es viejo y no tiene patrón, mostrar los días del campo como total
+    const totalMostrar = tieneP ? tot : parsearTotal(r.dias);
+    const aviso = tieneP ? '' : ' <span title="Registro sin calendario; muestra los días del campo" style="color:var(--orange)">*</span>';
+    return `<tr>
+      <td><strong>${r.nombre}</strong><br><span style="font-size:11px;color:var(--text-dim)">${r.dni}</span></td>
+      <td style="font-size:12px">${r.proyecto || '—'}<br><span style="color:var(--text-muted)">${r.cliente || ''}</span></td>
+      ${cells}
+      <td style="text-align:center;font-weight:700;color:var(--navy)">${totalMostrar}${aviso}</td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <table class="records-table" style="min-width:620px">
+      <thead><tr>${head}</tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+    <p style="font-size:11px;color:var(--text-muted);margin-top:10px">● = día completo · ½ = medio día · · = no trabajó. <span style="color:var(--orange)">*</span> = registro anterior sin calendario (muestra los días del campo).</p>`;
 }
 
 // ── NUEVA PERSONA EN BBDD ──

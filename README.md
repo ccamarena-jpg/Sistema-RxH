@@ -57,3 +57,12 @@ El orden importa para no romper la app en producción:
    implementaciones → editar (lápiz) → Versión: Nueva → Implementar*. Mantén
    **Ejecutar como: Yo** y **Quién tiene acceso: Cualquiera**.
 3. Prueba: inicia sesión, verifica que carga la data y que puedes aprobar/registrar.
+
+### Calendario de asistencia (columna nueva)
+
+El backend nuevo agrega la columna **AL "DIAS DETALLE"** en la hoja `REGISTROS`,
+donde se guarda el patrón de días trabajados (ej. `1:1,2:0.5,15:1`). Al redesplegar
+`apps-script.gs`, agrega ese encabezado en la columna AL de la hoja. La pestaña
+**Asistencia** muestra el calendario por quincena (con filtros de ejecutivo, cliente,
+proyecto y supervisor); el supervisor marca los días al registrar y se autocompletan
+los "Días trabajados" (soporta medio día = ½).
