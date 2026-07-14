@@ -196,6 +196,11 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
+  // ── SELLO DE VERSIÓN (sin seguridad, para verificar el despliegue) ──
+  if (accion === 'version') {
+    return respond({ version: 'v2-logs-2026-07-14' });
+  }
+
   // ── SEGURIDAD ──
   if (!verificar_(e.parameter.token)) {
     return respond({ error: 'no-autorizado' });
