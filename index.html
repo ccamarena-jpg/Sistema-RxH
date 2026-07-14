@@ -1406,8 +1406,16 @@
 
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;align-items:flex-end">
     <div class="field" style="margin:0;min-width:150px">
-      <label style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Quincena</label>
-      <select id="asis-fil-quincena" onchange="renderAsistencia()" style="width:100%;padding:7px 12px;border-radius:6px;border:1px solid var(--border);font-size:13px;background:#fff;color:var(--text)"><option value="">Seleccionar...</option></select>
+      <label style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Mes</label>
+      <select id="asis-fil-mes" onchange="renderAsistencia()" style="width:100%;padding:7px 12px;border-radius:6px;border:1px solid var(--border);font-size:13px;background:#fff;color:var(--text)"><option value="">Seleccionar...</option></select>
+    </div>
+    <div class="field" style="margin:0;min-width:130px">
+      <label style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Ver</label>
+      <select id="asis-fil-parte" onchange="renderAsistencia()" style="width:100%;padding:7px 12px;border-radius:6px;border:1px solid var(--border);font-size:13px;background:#fff;color:var(--text)">
+        <option value="">Mes completo</option>
+        <option value="Q1">Solo Q1 (1–15)</option>
+        <option value="Q2">Solo Q2 (16–fin)</option>
+      </select>
     </div>
     <div class="field" style="margin:0;min-width:160px">
       <label style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Ejecutivo Cuentas</label>
@@ -3545,6 +3553,29 @@ function diasDeQuincena(q) {
   return { dias, mes, anio, quinc };
 }
 
+const MESES_MAP = {ENE:0,FEB:1,MAR:2,ABR:3,MAY:4,JUN:5,JUL:6,AGO:7,SEP:8,SET:8,OCT:9,NOV:10,DIC:11};
+
+// "Q2-FEB-2026" → "FEB-2026"
+function mesDeQuincena(q) {
+  const m = String(q||'').toUpperCase().match(/Q[12]-([A-Z]{3,4}-\d{4})/);
+  return m ? m[1] : '';
+}
+
+// Días de un mes. parte: '' = mes completo (1..fin), 'Q1' = 1..15, 'Q2' = 16..fin.
+function diasDeMes(mesKey, parte) {
+  const m = String(mesKey||'').toUpperCase().match(/([A-Z]{3,4})-(\d{4})/);
+  if (!m) return { dias: [] };
+  const mes = MESES_MAP[m[1].slice(0,3)], anio = +m[2];
+  if (mes === undefined) return { dias: [] };
+  const ultimo = new Date(anio, mes + 1, 0).getDate();
+  let from = 1, to = ultimo;
+  if (parte === 'Q1') { from = 1;  to = 15; }
+  else if (parte === 'Q2') { from = 16; to = ultimo; }
+  const dias = [];
+  for (let d = from; d <= to; d++) dias.push(d);
+  return { dias, mes, anio };
+}
+
 // "1:1,2:0.5,15:1" → { 1:1, 2:0.5, 15:1 }
 function parseAsistencia(s) {
   const o = {};
@@ -3626,8 +3657,19 @@ function _valAsis(id) { const el = document.getElementById(id); return el ? el.v
 
 function poblarFiltrosAsistencia() {
   const uniq = campo => [...new Set(registros.map(r => r[campo]).filter(Boolean))].sort();
+
+  // Meses disponibles, ordenados cronológicamente (año, luego mes)
+  const meses = [...new Set(registros.map(r => mesDeQuincena(r.quincena)).filter(Boolean))]
+    .sort((a, b) => {
+      const pa = a.match(/([A-Z]{3,4})-(\d{4})/), pb = b.match(/([A-Z]{3,4})-(\d{4})/);
+      if (!pa || !pb) return 0;
+      const ka = (+pa[2]) * 12 + (MESES_MAP[pa[1].slice(0,3)] || 0);
+      const kb = (+pb[2]) * 12 + (MESES_MAP[pb[1].slice(0,3)] || 0);
+      return ka - kb;
+    });
+
   const sets = {
-    'asis-fil-quincena':   uniq('quincena'),
+    'asis-fil-mes':        meses,
     'asis-fil-ejcuentas':  uniq('ejCuentas'),
     'asis-fil-cliente':    uniq('cliente'),
     'asis-fil-proyecto':   uniq('proyecto'),
@@ -3637,14 +3679,14 @@ function poblarFiltrosAsistencia() {
     const el = document.getElementById(id);
     if (!el) return;
     const prev = el.value;
-    const primera = id === 'asis-fil-quincena' ? 'Seleccionar...' : 'Todos';
+    const primera = id === 'asis-fil-mes' ? 'Seleccionar...' : 'Todos';
     el.innerHTML = '<option value="">' + primera + '</option>' +
       sets[id].map(v => `<option ${v === prev ? 'selected' : ''}>${v}</option>`).join('');
   });
 }
 
 function limpiarFiltrosAsistencia() {
-  ['asis-fil-ejcuentas','asis-fil-cliente','asis-fil-proyecto','asis-fil-supervisor']
+  ['asis-fil-parte','asis-fil-ejcuentas','asis-fil-cliente','asis-fil-proyecto','asis-fil-supervisor']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   renderAsistencia();
 }
@@ -3653,18 +3695,20 @@ function renderAsistencia() {
   poblarFiltrosAsistencia();
   const wrap = document.getElementById('asis-tabla-wrap');
   if (!wrap) return;
-  const q  = _valAsis('asis-fil-quincena');
+  const mes   = _valAsis('asis-fil-mes');
+  const parte = _valAsis('asis-fil-parte'); // '', 'Q1', 'Q2'
   const ej = _valAsis('asis-fil-ejcuentas');
   const cl = _valAsis('asis-fil-cliente');
   const pr = _valAsis('asis-fil-proyecto');
   const su = _valAsis('asis-fil-supervisor');
 
-  if (!q) {
-    wrap.innerHTML = '<p style="color:var(--text-dim);padding:24px;text-align:center">Selecciona una quincena para ver el calendario de días trabajados.</p>';
+  if (!mes) {
+    wrap.innerHTML = '<p style="color:var(--text-dim);padding:24px;text-align:center">Selecciona un mes para ver el calendario de días trabajados.</p>';
     return;
   }
 
-  let lista = registros.filter(r => r.quincena === q
+  let lista = registros.filter(r => mesDeQuincena(r.quincena) === mes
+    && (!parte || String(r.quincena).toUpperCase().indexOf(parte + '-') === 0)
     && (!ej || r.ejCuentas === ej)
     && (!cl || r.cliente === cl)
     && (!pr || r.proyecto === pr)
@@ -3675,38 +3719,50 @@ function renderAsistencia() {
     return;
   }
 
-  const info = diasDeQuincena(q);
+  // Agrupar por persona + proyecto, fusionando el patrón de días de Q1 y Q2 del mes
+  const grupos = {};
+  lista.forEach(r => {
+    const key = (r.dni || '') + '|' + (r.proyecto || '');
+    if (!grupos[key]) grupos[key] = { nombre: r.nombre, dni: r.dni, proyecto: r.proyecto, cliente: r.cliente, pat: {}, diasCampo: 0, tieneP: false };
+    const p = parseAsistencia(r.diasDetalle);
+    if (Object.keys(p).length) { grupos[key].tieneP = true; Object.keys(p).forEach(d => { grupos[key].pat[d] = p[d]; }); }
+    grupos[key].diasCampo += parsearTotal(r.dias);
+  });
+  const filas = Object.keys(grupos).map(k => grupos[k])
+    .sort((a, b) => String(a.nombre).localeCompare(String(b.nombre)));
+
+  const info = diasDeMes(mes, parte);
   const head = '<th style="text-align:left">Trabajador</th><th style="text-align:left">Proyecto</th>'
-    + info.dias.map(d => `<th style="text-align:center;min-width:26px">${d}</th>`).join('')
+    + info.dias.map(d => `<th style="text-align:center;min-width:24px">${d}</th>`).join('')
     + '<th style="text-align:center">Total</th>';
 
-  const body = lista.map(r => {
-    const pat = parseAsistencia(r.diasDetalle);
-    const tieneP = Object.keys(pat).length > 0;
+  const body = filas.map(g => {
     let tot = 0;
     const cells = info.dias.map(d => {
-      const v = pat[d];
+      const v = g.pat[d];
       if (v === 1)   { tot += 1;   return '<td style="text-align:center;background:rgba(26,58,107,0.12);color:var(--navy);font-weight:700">●</td>'; }
       if (v === 0.5) { tot += 0.5; return '<td style="text-align:center;background:rgba(240,194,48,0.30);color:var(--accent2);font-weight:700">½</td>'; }
       return '<td style="text-align:center;color:var(--text-dim)">·</td>';
     }).join('');
-    // Si el registro es viejo y no tiene patrón, mostrar los días del campo como total
-    const totalMostrar = tieneP ? tot : parsearTotal(r.dias);
-    const aviso = tieneP ? '' : ' <span title="Registro sin calendario; muestra los días del campo" style="color:var(--orange)">*</span>';
+    // Si no hay patrón (registro viejo), mostrar la suma de "días" del campo
+    const totalMostrar = g.tieneP ? tot : g.diasCampo;
+    const aviso = g.tieneP ? '' : ' <span title="Registro sin calendario; muestra los días del campo" style="color:var(--orange)">*</span>';
     return `<tr>
-      <td><strong>${r.nombre}</strong><br><span style="font-size:11px;color:var(--text-dim)">${r.dni}</span></td>
-      <td style="font-size:12px">${r.proyecto || '—'}<br><span style="color:var(--text-muted)">${r.cliente || ''}</span></td>
+      <td><strong>${g.nombre}</strong><br><span style="font-size:11px;color:var(--text-dim)">${g.dni}</span></td>
+      <td style="font-size:12px">${g.proyecto || '—'}<br><span style="color:var(--text-muted)">${g.cliente || ''}</span></td>
       ${cells}
       <td style="text-align:center;font-weight:700;color:var(--navy)">${totalMostrar}${aviso}</td>
     </tr>`;
   }).join('');
 
+  const titulo = 'Mostrando ' + filas.length + ' persona(s) — ' + mes + (parte ? ' · ' + parte : ' · mes completo');
   wrap.innerHTML = `
-    <table class="records-table" style="min-width:620px">
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">${titulo}</div>
+    <table class="records-table" style="min-width:${Math.max(620, 300 + info.dias.length * 26)}px">
       <thead><tr>${head}</tr></thead>
       <tbody>${body}</tbody>
     </table>
-    <p style="font-size:11px;color:var(--text-muted);margin-top:10px">● = día completo · ½ = medio día · · = no trabajó. <span style="color:var(--orange)">*</span> = registro anterior sin calendario (muestra los días del campo).</p>`;
+    <p style="font-size:11px;color:var(--text-muted);margin-top:10px">● = día completo · ½ = medio día · · = no trabajó. <span style="color:var(--orange)">*</span> = registro sin calendario (muestra los días del campo).</p>`;
 }
 
 // ── NUEVA PERSONA EN BBDD ──
