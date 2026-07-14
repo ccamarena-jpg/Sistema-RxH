@@ -1479,8 +1479,34 @@
     <div class="step-content">
       <h3>Abre el editor de Apps Script</h3>
       <p>En tu Google Sheet, ve a <strong>Extensiones → Apps Script</strong>. Se abrirá un editor de código. Borra todo lo que haya y pega el siguiente código:</p>
-      <div class="code-block" id="apps-script-code"><button class="copy-code-btn" onclick="copiarCodigo()">Copiar</button>function doPost(e) {
+      <div class="code-block" id="apps-script-code"><button class="copy-code-btn" onclick="copiarCodigo()">Copiar</button>// ── SEGURIDAD: verificar identidad del usuario @ttaudit.com ──
+var CLIENT_ID = '545979370697-jg1delh4ce63cbcgfnb1dv6ppepg9i3v.apps.googleusercontent.com';
+var DOMINIO   = 'ttaudit.com';
+function verificar_(token) {
+  if (!token) return null;
+  var cache = CacheService.getScriptCache();
+  var key = 'tok_' + Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token));
+  var cached = cache.get(key);
+  if (cached) return cached;
+  try {
+    var resp = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token), { muteHttpExceptions: true });
+    if (resp.getResponseCode() !== 200) return null;
+    var info = JSON.parse(resp.getContentText());
+    if (info.aud !== CLIENT_ID) return null;
+    if (String(info.email_verified) !== 'true') return null;
+    var email = String(info.email || '').toLowerCase();
+    if (email.slice(-(DOMINIO.length + 1)) !== '@' + DOMINIO) return null;
+    if (info.exp && (parseInt(info.exp, 10) * 1000) < Date.now()) return null;
+    cache.put(key, email, 300);
+    return email;
+  } catch (err) { return null; }
+}
+
+function doPost(e) {
   var data = JSON.parse(e.parameter.data || e.postData.contents);
+  if (!verificar_(e.parameter.token || data.token)) {
+    return ContentService.createTextOutput(JSON.stringify({error:'no-autorizado'})).setMimeType(ContentService.MimeType.JSON);
+  }
 
   // ── AGREGAR PERSONA A BBDD ──
   if (data.accion === 'agregarPersona') {
@@ -1562,6 +1588,10 @@ function doGet(e) {
     return ContentService
       .createTextOutput(json)
       .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (!verificar_(e.parameter.token)) {
+    return respond({ error: 'no-autorizado' });
   }
 
   // ── AGREGAR PERSONA A BBDD (via GET/JSONP) ──
@@ -2089,7 +2119,7 @@ function fetchScript(params) {
   // Intenta JSONP primero; si falla en 8s, usa fetch() como fallback
   return new Promise((resolve, reject) => {
     const cbName = 'cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-    const qs = Object.entries({...params, callback: cbName})
+    const qs = Object.entries({...params, token: GOOGLE_TOKEN, callback: cbName})
       .map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))
       .join('&');
     const url = SCRIPT_URL + '?' + qs;
@@ -2108,6 +2138,7 @@ function fetchScript(params) {
     window[cbName] = (data) => {
       delete window[cbName];
       try { (document.head || document.body).removeChild(script); } catch(e) {}
+      if (data && data.error === 'no-autorizado') manejarNoAutorizado();
       settle(resolve, data);
     };
     script.onerror = () => {
@@ -2131,7 +2162,7 @@ function fetchScript(params) {
 
 // Fallback usando fetch() directo (sin callback) para Safari / móviles estrictos
 function fetchScriptFallback(params) {
-  const qs = Object.entries(params)
+  const qs = Object.entries({...params, token: GOOGLE_TOKEN})
     .map(([k,v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))
     .join('&');
   const url = SCRIPT_URL + '?' + qs;
@@ -2140,7 +2171,9 @@ function fetchScriptFallback(params) {
     .then(text => {
       // Apps Script puede devolver JSON plano o envuelto en callback(...)
       const clean = text.replace(/^[\w$]+\(/, '').replace(/\)\s*;?\s*$/, '').trim();
-      return JSON.parse(clean);
+      const data = JSON.parse(clean);
+      if (data && data.error === 'no-autorizado') manejarNoAutorizado();
+      return data;
     });
 }
 
@@ -2148,6 +2181,21 @@ function fetchScriptFallback(params) {
 let SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjI2fVUGboPTdft0RpnKQyJf6nRUn8lqKGrvH2MqUV1TM13aIcToPhuUblgBeIU6kI/exec';
 // También guardar en localStorage por compatibilidad
 localStorage.setItem('rxh_script_url', SCRIPT_URL);
+
+// ── AUTENTICACIÓN ──
+// Token de identidad de Google (JWT) del login. El backend (Apps Script) lo
+// verifica en cada petición: confirma que es un usuario @ttaudit.com válido.
+let GOOGLE_TOKEN = '';
+
+// Cuando el backend responde 'no-autorizado' (token inválido o sesión expirada
+// tras ~1h), avisamos una sola vez y recargamos para volver a iniciar sesión.
+let _sesionAvisada = false;
+function manejarNoAutorizado() {
+  if (_sesionAvisada) return;
+  _sesionAvisada = true;
+  try { showToast('Tu sesión expiró. Vuelve a iniciar sesión.', true); } catch(e) {}
+  setTimeout(() => location.reload(), 2500);
+}
 
 // ── DATOS ──
 let proyectosPorCliente = {}; // se llena desde Sheets
@@ -2587,6 +2635,7 @@ async function guardarRegistro() {
       // no-cors evita el error CORS de Apps Script
       const params = new URLSearchParams();
       params.append('data', JSON.stringify(payload));
+      params.append('token', GOOGLE_TOKEN);
       await fetch(SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
@@ -3948,6 +3997,8 @@ const ADMINS_EJCUENTAS_MAP = {
 const ADMINS = Object.keys(ADMINS_EJCUENTAS_MAP);
 
 function onGoogleLogin(response) {
+  GOOGLE_TOKEN = response.credential;   // guardar el JWT para autenticar peticiones al backend
+  _sesionAvisada = false;
   const payload = JSON.parse(atob(response.credential.split('.')[1]));
   const email   = payload.email.toLowerCase();
   const name    = payload.name;
@@ -4598,6 +4649,7 @@ async function confirmarCargaMasiva() {
       try {
         const params = new URLSearchParams();
         params.append('data', JSON.stringify(payload));
+        params.append('token', GOOGLE_TOKEN);
         await fetch(SCRIPT_URL, {
           method: 'POST', mode: 'no-cors',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

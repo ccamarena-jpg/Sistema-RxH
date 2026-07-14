@@ -30,6 +30,30 @@ editas index.html  →  commit + push a GitHub  →  Vercel despliega solo
 | Archivo | Qué es |
 |---------|--------|
 | `index.html` | La aplicación completa (HTML + CSS + JS) |
-| `vercel.json` | Config de despliegue estático en Vercel |
+| `apps-script.gs` | Backend (Google Apps Script) con verificación de identidad |
+| `vercel.json` / `netlify.toml` | Config de despliegue estático |
 | `deploy.bat` | Script de publicación manual (doble clic) |
 | `.gitattributes` | Normaliza saltos de línea (LF) |
+
+## Seguridad del backend
+
+El frontend envía en cada petición el **token de identidad de Google** del usuario
+logueado. El Apps Script (`apps-script.gs`) lo verifica contra Google
+(`verificar_`): confirma que sea una cuenta **@ttaudit.com** verificada y no
+expirada; si no, responde `{error:'no-autorizado'}` y no ejecuta ninguna acción.
+
+La sesión de Google dura ~1 hora: al expirar, la app avisa y recarga para volver
+a iniciar sesión.
+
+### Cómo actualizar el backend (redeploy)
+
+El orden importa para no romper la app en producción:
+
+1. **Primero** publica el frontend (ya lo hace el auto-push). El nuevo `index.html`
+   envía el token pero sigue funcionando con el backend viejo (el parámetro extra
+   se ignora), así que no hay corte.
+2. **Luego** abre el Google Sheet → *Extensiones → Apps Script*, pega el contenido
+   de `apps-script.gs` (reemplazando todo) y ve a *Implementar → Gestionar
+   implementaciones → editar (lápiz) → Versión: Nueva → Implementar*. Mantén
+   **Ejecutar como: Yo** y **Quién tiene acceso: Cualquiera**.
+3. Prueba: inicia sesión, verifica que carga la data y que puedes aprobar/registrar.
