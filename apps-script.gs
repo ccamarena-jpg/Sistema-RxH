@@ -1,57 +1,17 @@
 // ═══════════════════════════════════════════════════════════
-//  SISTEMA RxH — Apps Script completo (con blindaje de seguridad)
+//  SISTEMA RxH — Apps Script completo (SIN verificación de token)
 //  Pega este código completo en Apps Script, reemplazando todo.
 //  Luego: Implementar → Administrar implementaciones → editar
 //  la implementación existente → Nueva versión → Guardar.
 //  (Editar el deploy existente conserva la misma URL)
 //
-//  SEGURIDAD: cada petición debe traer el token de Google del
-//  usuario logueado (param `token`). verificar_() confirma que sea
-//  una cuenta @ttaudit.com válida; si no, no ejecuta nada.
+//  NOTA: este backend NO valida identidad. Cualquiera con la URL
+//  puede leer/escribir. El login de Google en la web solo controla
+//  los roles del frontend.
 //
-//  NUEVO: columna AL "DIAS DETALLE" para el calendario de asistencia
-//  (patrón de días trabajados que llena el supervisor).
+//  Incluye: columna AL "DIAS DETALLE" (calendario de asistencia) y
+//  campo rxhDetalle (para exportar el emisor del RxH).
 // ═══════════════════════════════════════════════════════════
-
-var CLIENT_ID = '545979370697-jg1delh4ce63cbcgfnb1dv6ppepg9i3v.apps.googleusercontent.com';
-var DOMINIO   = 'ttaudit.com';
-
-// Devuelve el email (minúsculas) si el token es de un usuario @ttaudit.com válido; si no, null.
-function verificar_(token) {
-  var props = PropertiesService.getScriptProperties();
-  function fail(msg) {
-    Logger.log('verificar_: ' + msg);
-    try { props.setProperty('ultimo_verificar', msg); } catch (e) {}
-    return null;
-  }
-  if (!token) return fail('SIN token');
-  var cache = CacheService.getScriptCache();
-  var key = 'tok_' + Utilities.base64EncodeWebSafe(
-    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token)
-  );
-  var cached = cache.get(key);
-  if (cached) return cached;
-  try {
-    var resp = UrlFetchApp.fetch(
-      'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token),
-      { muteHttpExceptions: true }
-    );
-    var code = resp.getResponseCode();
-    if (code !== 200) return fail('tokeninfo code=' + code + ' body=' + resp.getContentText().slice(0, 150));
-    var info = JSON.parse(resp.getContentText());
-    if (String(info.aud) !== CLIENT_ID) return fail('aud NO coincide recibido=' + info.aud);
-    if (String(info.email_verified) === 'false') return fail('email_verified=false');
-    var email = String(info.email || '').toLowerCase();
-    if (email.slice(-(DOMINIO.length + 1)) !== '@' + DOMINIO) return fail('dominio no permitido email=' + email);
-    if (info.exp && (parseInt(info.exp, 10) * 1000) < Date.now()) return fail('token expirado exp=' + info.exp);
-    cache.put(key, email, 300);
-    try { props.setProperty('ultimo_verificar', 'OK ' + email); } catch (e) {}
-    return email;
-  } catch (err) {
-    return fail('EXCEPCION ' + err);
-  }
-}
-
 
 // Crea el encabezado AL "DIAS DETALLE" si aún no existe (idempotente y barato).
 function asegurarHeaderDiasDetalle_() {
@@ -63,49 +23,21 @@ function asegurarHeaderDiasDetalle_() {
   }
 }
 
-// Puedes ejecutar esta función UNA vez desde el editor (botón Ejecutar) para
-// crear el encabezado de inmediato, sin esperar al primer uso de la app.
+// Ejecuta esta función una vez desde el editor para crear el encabezado ya mismo.
 function configurarHoja() {
   asegurarHeaderDiasDetalle_();
-}
-
-// ⚙️ EJECUTA ESTA FUNCIÓN UNA VEZ desde el editor (selecciónala y pulsa ▶ Ejecutar).
-// Sirve para AUTORIZAR el permiso de "solicitudes externas" (UrlFetchApp) que necesita
-// el login, y para confirmar que la validación del token funciona.
-// Al terminar, en "Registro de ejecución" (abajo) debe decir: "UrlFetchApp OK — código: 400".
-function probarPermisos() {
-  var r = UrlFetchApp.fetch(
-    'https://oauth2.googleapis.com/tokeninfo?id_token=prueba',
-    { muteHttpExceptions: true }
-  );
-  Logger.log('UrlFetchApp OK — código: ' + r.getResponseCode());
-  asegurarHeaderDiasDetalle_();
-  Logger.log('Hoja OK — encabezado AL verificado');
-  return 'OK';
 }
 
 
 function doPost(e) {
   var data = JSON.parse(e.parameter.data || e.postData.contents);
 
-  // ── SEGURIDAD ──
-  if (!verificar_(e.parameter.token || data.token)) {
-    return ContentService.createTextOutput(JSON.stringify({ error: 'no-autorizado' }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-
   // ── AGREGAR PERSONA A BBDD (vía POST) ──
   if (data.accion === 'agregarPersona') {
     var bbdd = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('BBDD');
     bbdd.appendRow([
-      data.nombre,       // A: APELLIDOS Y NOMBRE
-      data.dni,          // B: DNI
-      data.ciudad,       // C: CIUDAD
-      data.departamento, // D: DEPARTAMENTO
-      data.banco,        // E: BANCO
-      data.cuenta,       // F: # CUENTA
-      data.cci,          // G: # CCI
-      'ACTIVO'           // H: STATUS
+      data.nombre, data.dni, data.ciudad, data.departamento,
+      data.banco, data.cuenta, data.cci, 'ACTIVO'
     ]);
     return ContentService
       .createTextOutput(JSON.stringify({ status: 'ok' }))
@@ -184,33 +116,12 @@ function doGet(e) {
       .setMimeType(ContentService.MimeType.JSON);
   }
 
-  // ── SELLO DE VERSIÓN (sin seguridad, para verificar el despliegue) ──
-  if (accion === 'version') {
-    return respond({ version: 'v3-diag-2026-07-14' });
-  }
-
-  // ── DIAGNÓSTICO: motivo del último rechazo (temporal, quitar luego) ──
-  if (accion === 'ultimoerror') {
-    return respond({ ultimo: PropertiesService.getScriptProperties().getProperty('ultimo_verificar') || 'sin datos' });
-  }
-
-  // ── SEGURIDAD ──
-  if (!verificar_(e.parameter.token)) {
-    return respond({ error: 'no-autorizado' });
-  }
-
   // ── AGREGAR PERSONA A BBDD (vía GET/JSONP) ──
   if (accion === 'agregarPersona') {
     var bbdd = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('BBDD');
     bbdd.appendRow([
-      e.parameter.nombre,       // A: APELLIDOS Y NOMBRE
-      e.parameter.dni,          // B: DNI
-      e.parameter.ciudad,       // C: CIUDAD
-      e.parameter.departamento, // D: DEPARTAMENTO
-      e.parameter.banco,        // E: BANCO
-      e.parameter.cuenta,       // F: # CUENTA
-      e.parameter.cci,          // G: # CCI
-      'ACTIVO'                  // H: STATUS
+      e.parameter.nombre, e.parameter.dni, e.parameter.ciudad, e.parameter.departamento,
+      e.parameter.banco, e.parameter.cuenta, e.parameter.cci, 'ACTIVO'
     ]);
     return respond({ status: 'ok' });
   }
@@ -237,7 +148,7 @@ function doGet(e) {
     return respond({ found: false });
   }
 
-  // ── OBTENER BBDD COMPLETA (para carga masiva y modal nuevo personal) ──
+  // ── OBTENER BBDD COMPLETA ──
   if (accion === 'bbdd') {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('BBDD');
     var data  = sheet.getDataRange().getValues();
@@ -375,16 +286,14 @@ function doGet(e) {
         total:        totalStr,
         rxh:          col(row, 'EMITIÓ RXH'),
         numRxh:       normalizarRxh(colStr(row, ['# RECIBO', '#RECIBO', 'N° RECIBO', 'RECIBO', 'NUM RECIBO', 'NUMERO RECIBO'])),
-        // Detalle completo del RxH (num::fecha::monto::emisor|...) desde columna AB (28)
-        rxhDetalle:   String(row[27] || ''),
+        rxhDetalle:   String(row[27] || ''),   // AB: detalle completo num::fecha::monto::emisor
         emisor:       col(row, 'NOMBRE EMISOR'),
         estado:       col(row, 'ESTADO'),
         obsCuentas:   col(row, 'OBS CUENTAS'),
         aprobadoPor:  col(row, 'APROBADO POR GERENTE'),
         obsCont:      col(row, 'OBS CONTABILIDAD'),
         obsContabilidad: col(row, 'OBS CONTABILIDAD'),
-        // Patrón de asistencia (calendario) desde columna AL (38)
-        diasDetalle:  String(row[37] || '')
+        diasDetalle:  String(row[37] || '')    // AL: patrón de asistencia
       });
     }
     return respond({ registros: result });
@@ -430,7 +339,6 @@ function doGet(e) {
       sheet.getRange(fila, 24).setValue(total);       // X: TOTAL A PAGAR
       sheet.getRange(fila, 30).setValue(nuevoEstado); // AD: ESTADO
       sheet.getRange(fila, 31).setValue('');          // AE: limpiar obs cuentas
-      // Si el supervisor corrigió también la asistencia, actualizar AL
       if (e.parameter.diasDetalle !== undefined && e.parameter.diasDetalle !== '') {
         sheet.getRange(fila, 38).setValue(e.parameter.diasDetalle); // AL: DIAS DETALLE
       }
@@ -449,7 +357,6 @@ function doGet(e) {
       sheet.getRange(fila, 36).setValue('No');                       // AJ: APROBADO CONT
 
     } else {
-      // contabilidad (aprobación o rechazo)
       sheet.getRange(fila, 30).setValue(nuevoEstado);                // AD: ESTADO
       sheet.getRange(fila, 34).setValue(obs);                        // AH: OBS CONTABILIDAD
       sheet.getRange(fila, 35).setValue(new Date());                 // AI: FECHA
