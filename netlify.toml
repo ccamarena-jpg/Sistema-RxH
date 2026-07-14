@@ -1,0 +1,5 @@
+# Configuracion de despliegue en Netlify.
+# Sitio estatico de un solo archivo (index.html en la raiz): sin build.
+[build]
+  publish = "."
+  command = ""
