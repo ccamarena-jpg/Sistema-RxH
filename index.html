@@ -736,6 +736,14 @@
   <div class="form-card">
     <div class="form-card-title">👤 Datos del trabajador</div>
     <div class="form-grid">
+      <div class="field span-2" style="position:relative">
+        <label>Buscar por nombre o DNI</label>
+        <input type="text" id="f-buscar-nombre" placeholder="Escribe el nombre o DNI y elige de la lista..." autocomplete="off"
+          oninput="buscarPorNombre()"
+          onblur="setTimeout(function(){var b=document.getElementById('f-sugerencias');if(b)b.style.display='none';},200)"
+          style="text-transform:uppercase">
+        <div id="f-sugerencias" style="display:none;position:absolute;z-index:50;left:0;right:0;top:100%;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(26,58,107,0.15);max-height:280px;overflow-y:auto;margin-top:2px"></div>
+      </div>
       <div class="field span-2">
         <label>DNI — busca al trabajador</label>
         <div class="input-row">
@@ -2313,6 +2321,7 @@ function switchTab(tab) {
   if (tab === 'registro') {
     // Siempre recargar proyectos al abrir el formulario — garantiza selects llenos para todos
     cargarProyectos();
+    cargarBBDD(); // precargar la BBDD para el buscador por nombre
   }
   if (tab === 'mis-registros') {
     cargarRegistrosDesdeSheets().then(() => renderMisRegistros());
@@ -2481,6 +2490,65 @@ function filterSupervisores() {
 }
 
 // ── BUSCAR DNI ──
+// ── BÚSQUEDA POR NOMBRE (typeahead contra la BBDD) ──
+let bbddCache = [];
+
+async function cargarBBDD() {
+  if (bbddCache.length || !SCRIPT_URL) return;
+  try {
+    const res = await fetchScript({ accion: 'bbdd' });
+    if (res && res.personas) bbddCache = res.personas;
+  } catch (e) { /* silencioso */ }
+}
+
+// Rellena los campos del trabajador desde un registro de la BBDD
+function fillTrabajador(p) {
+  if (p.dni) document.getElementById('f-dni').value = String(p.dni).replace(/\D/g, '').slice(0, 8);
+  document.getElementById('f-nombre').value       = (p.nombre || '').toUpperCase();
+  document.getElementById('f-departamento').value = (p.departamento || p.ubigeo || '').toUpperCase();
+  document.getElementById('f-ciudad').value       = (p.ciudad || '').toUpperCase();
+  asignarBanco(p.banco || '');
+  document.getElementById('f-cuenta').value       = String(p.cuenta || '').replace(/\s/g, '');
+  document.getElementById('f-cci').value          = String(p.cci || '').replace(/\s/g, '');
+}
+
+function buscarPorNombre() {
+  const box = document.getElementById('f-sugerencias');
+  const q = document.getElementById('f-buscar-nombre').value.trim().toUpperCase();
+  if (q.length < 2) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  if (!bbddCache.length) { cargarBBDD().then(() => buscarPorNombre()); }
+  const norm = s => String(s || '').toUpperCase();
+  const matches = bbddCache
+    .filter(p => norm(p.nombre).includes(q) || norm(p.dni).includes(q))
+    .slice(0, 8);
+  if (!matches.length) {
+    box.innerHTML = '<div style="padding:8px 12px;color:var(--text-dim);font-size:13px">Sin coincidencias' +
+      (bbddCache.length ? '' : ' (cargando BBDD...)') + '</div>';
+    box.style.display = 'block';
+    return;
+  }
+  box.innerHTML = matches.map(p => {
+    const idx = bbddCache.indexOf(p);
+    return `<div onclick="seleccionarTrabajador(${idx})" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px"
+      onmouseover="this.style.background='#f0f4ff'" onmouseout="this.style.background=''">
+      <strong>${p.nombre}</strong><br>
+      <span style="color:var(--text-dim);font-size:11px">DNI ${p.dni}${p.ciudad ? ' · ' + p.ciudad : ''}</span>
+    </div>`;
+  }).join('');
+  box.style.display = 'block';
+}
+
+function seleccionarTrabajador(idx) {
+  const p = bbddCache[idx];
+  if (!p) return;
+  fillTrabajador(p);
+  document.getElementById('f-buscar-nombre').value = (p.nombre || '').toUpperCase();
+  const box = document.getElementById('f-sugerencias');
+  box.style.display = 'none'; box.innerHTML = '';
+  const errDni = document.getElementById('f-dni-error'); if (errDni) errDni.style.display = 'none';
+  showToast('✓ Trabajador seleccionado');
+}
+
 async function buscarDNI() {
   const dni = document.getElementById('f-dni').value.trim();
   const errDni = document.getElementById('f-dni-error');
@@ -2760,6 +2828,9 @@ function limpiarFormulario() {
   // Reset del calendario de asistencia
   asistenciaForm = {};
   renderAsistenciaForm();
+  // Reset del buscador por nombre
+  const bn = document.getElementById('f-buscar-nombre'); if (bn) bn.value = '';
+  const sug = document.getElementById('f-sugerencias'); if (sug) { sug.style.display = 'none'; sug.innerHTML = ''; }
 }
 
 // ── TABLA CUENTAS ──
