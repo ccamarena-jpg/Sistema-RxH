@@ -697,6 +697,12 @@
           <option>Q1-ABR-2026</option><option>Q2-ABR-2026</option>
           <option>Q1-MAY-2026</option><option>Q2-MAY-2026</option>
           <option>Q1-JUN-2026</option><option>Q2-JUN-2026</option>
+          <option>Q1-JUL-2026</option><option>Q2-JUL-2026</option>
+          <option>Q1-AGO-2026</option><option>Q2-AGO-2026</option>
+          <option>Q1-SEP-2026</option><option>Q2-SEP-2026</option>
+          <option>Q1-OCT-2026</option><option>Q2-OCT-2026</option>
+          <option>Q1-NOV-2026</option><option>Q2-NOV-2026</option>
+          <option>Q1-DIC-2026</option><option>Q2-DIC-2026</option>
         </select>
       </div>
       <div class="field">
@@ -1345,6 +1351,12 @@
           <option>Q1-ABR-2026</option><option>Q2-ABR-2026</option>
           <option>Q1-MAY-2026</option><option>Q2-MAY-2026</option>
           <option>Q1-JUN-2026</option><option>Q2-JUN-2026</option>
+          <option>Q1-JUL-2026</option><option>Q2-JUL-2026</option>
+          <option>Q1-AGO-2026</option><option>Q2-AGO-2026</option>
+          <option>Q1-SEP-2026</option><option>Q2-SEP-2026</option>
+          <option>Q1-OCT-2026</option><option>Q2-OCT-2026</option>
+          <option>Q1-NOV-2026</option><option>Q2-NOV-2026</option>
+          <option>Q1-DIC-2026</option><option>Q2-DIC-2026</option>
         </select>
       </div>
       <div class="field">
@@ -2980,6 +2992,8 @@ function renderTablaAprobacion(filtro) {
     if (filC && r.cliente    !== filC) return false;
     if (filP && r.proyecto   !== filP) return false;
     if (filS && !esMismoSupervisor(r.supervisor, filS)) return false;
+    if (filEj && (r.ejCuentas||'').trim().toUpperCase() !== filEj.trim().toUpperCase()) return false;
+    if (filAprob && (r.aprobadoPor||'').trim() !== filAprob.trim()) return false;
     if (filtro === 'revision')  return ['EN REVISIÓN CUENTAS'].includes(r.estado);
     if (filtro === 'observado') return ['OBSERVADO-CUENTAS'].includes(r.estado);
     if (filtro === 'aprobado')  return ['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado);
