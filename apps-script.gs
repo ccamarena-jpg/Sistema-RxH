@@ -18,7 +18,13 @@ var DOMINIO   = 'ttaudit.com';
 
 // Devuelve el email (minúsculas) si el token es de un usuario @ttaudit.com válido; si no, null.
 function verificar_(token) {
-  if (!token) { Logger.log('verificar_: SIN token'); return null; }
+  var props = PropertiesService.getScriptProperties();
+  function fail(msg) {
+    Logger.log('verificar_: ' + msg);
+    try { props.setProperty('ultimo_verificar', msg); } catch (e) {}
+    return null;
+  }
+  if (!token) return fail('SIN token');
   var cache = CacheService.getScriptCache();
   var key = 'tok_' + Utilities.base64EncodeWebSafe(
     Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token)
@@ -31,36 +37,18 @@ function verificar_(token) {
       { muteHttpExceptions: true }
     );
     var code = resp.getResponseCode();
-    if (code !== 200) {
-      Logger.log('verificar_: tokeninfo code=' + code + ' body=' + resp.getContentText().slice(0, 200));
-      return null;
-    }
+    if (code !== 200) return fail('tokeninfo code=' + code + ' body=' + resp.getContentText().slice(0, 150));
     var info = JSON.parse(resp.getContentText());
-    // aud puede venir como string; comparar contra el client_id esperado
-    if (String(info.aud) !== CLIENT_ID) {
-      Logger.log('verificar_: aud NO coincide. recibido=' + info.aud + ' esperado=' + CLIENT_ID);
-      return null;
-    }
-    // email_verified: solo rechazar si es explícitamente false (Workspace a veces no lo manda)
-    if (String(info.email_verified) === 'false') {
-      Logger.log('verificar_: email_verified=false');
-      return null;
-    }
+    if (String(info.aud) !== CLIENT_ID) return fail('aud NO coincide recibido=' + info.aud);
+    if (String(info.email_verified) === 'false') return fail('email_verified=false');
     var email = String(info.email || '').toLowerCase();
-    if (email.slice(-(DOMINIO.length + 1)) !== '@' + DOMINIO) {
-      Logger.log('verificar_: dominio no permitido, email=' + email);
-      return null;
-    }
-    if (info.exp && (parseInt(info.exp, 10) * 1000) < Date.now()) {
-      Logger.log('verificar_: token expirado exp=' + info.exp);
-      return null;
-    }
-    cache.put(key, email, 300); // cachear 5 min para bajar latencia
-    Logger.log('verificar_: OK ' + email);
+    if (email.slice(-(DOMINIO.length + 1)) !== '@' + DOMINIO) return fail('dominio no permitido email=' + email);
+    if (info.exp && (parseInt(info.exp, 10) * 1000) < Date.now()) return fail('token expirado exp=' + info.exp);
+    cache.put(key, email, 300);
+    try { props.setProperty('ultimo_verificar', 'OK ' + email); } catch (e) {}
     return email;
   } catch (err) {
-    Logger.log('verificar_: EXCEPCION ' + err);
-    return null;
+    return fail('EXCEPCION ' + err);
   }
 }
 
@@ -198,7 +186,12 @@ function doGet(e) {
 
   // ── SELLO DE VERSIÓN (sin seguridad, para verificar el despliegue) ──
   if (accion === 'version') {
-    return respond({ version: 'v2-logs-2026-07-14' });
+    return respond({ version: 'v3-diag-2026-07-14' });
+  }
+
+  // ── DIAGNÓSTICO: motivo del último rechazo (temporal, quitar luego) ──
+  if (accion === 'ultimoerror') {
+    return respond({ ultimo: PropertiesService.getScriptProperties().getProperty('ultimo_verificar') || 'sin datos' });
   }
 
   // ── SEGURIDAD ──
