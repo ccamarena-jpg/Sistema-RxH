@@ -1467,16 +1467,20 @@
   <!-- Instrucciones de columnas -->
   <div class="form-card">
     <div class="form-card-title">📄 Formato requerido del Excel</div>
-    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">El archivo debe tener estas columnas en el orden exacto (fila 1 = encabezados, sin columna de fecha — esta se genera automáticamente):</p>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">El archivo debe tener estas columnas en el orden exacto (fila 1 = encabezados, sin columna de fecha — se genera automáticamente):</p>
     <div style="overflow-x:auto">
     <table class="records-table" style="font-size:12px">
       <thead><tr>
-        <th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>I</th><th>J</th><th>K</th><th>L</th><th>M</th><th>N</th>
+        <th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>I</th><th>J</th><th>K</th><th>L</th><th>M</th><th>N</th><th>O … AS</th>
       </tr></thead>
       <tbody><tr>
-        <td>Quincena</td><td>Cliente</td><td>Proyecto</td><td>Supervisor</td><td>Ej. Cuentas</td><td>DNI</td><td>Días</td><td>Pago/día</td><td>Mov.diaria</td><td>Mov.adicional</td><td>Mov.viajera</td><td>Adelanto</td><td>Megas</td><td>Otros</td>
+        <td>Quincena</td><td>Cliente</td><td>Proyecto</td><td>Supervisor</td><td>Ej. Cuentas</td><td>DNI</td><td>Días</td><td>Pago/día</td><td>Mov.diaria</td><td>Mov.adicional</td><td>Mov.viajera</td><td>Adelanto</td><td>Megas</td><td>Otros</td><td>Día 1 … Día 31</td>
       </tr></tbody>
     </table>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:10px;background:#f0f4ff;border-radius:8px;padding:10px 12px;border-left:3px solid var(--navy)">
+      <strong>Días trabajados (columnas O a AS = Día 1 … Día 31):</strong> marca cada día del mes que la persona trabajó con <strong>1</strong> (día completo) o <strong>0.5</strong> (medio día); deja vacío si no trabajó. Para Q1 usa Día 1–15; para Q2, Día 16–fin de mes.
+      La columna <strong>"Días"</strong> (G) se calcula sola a partir de esas marcas — puedes dejarla vacía. Si NO llenas ninguna marca, se usa el número que pongas en "Días".
     </div>
     <div style="margin-top:12px;display:flex;gap:8px">
       <button class="btn btn-ghost" style="font-size:12px" onclick="descargarPlantilla()">⬇ Descargar plantilla</button>
@@ -4810,7 +4814,16 @@ async function procesarExcelCarga(file) {
     const [quincena, cliente, proyecto, supervisor, ejCuentas, dni,
            dias, pagoDia, movDia, movAd, movVi, adelanto, megas, otros] = row;
 
-    const diasN    = parseFloat(dias)    || 0;
+    // Matriz de asistencia: columnas 15+ (índices 14..44) = Día 1 … Día 31 (día del mes)
+    const asis = {};
+    row.slice(14, 45).forEach((cell, j) => {
+      const v = String(cell).trim().toLowerCase();
+      if (!v || v === '0') return;
+      asis[j + 1] = (v === '0.5' || v === '.5' || v === '½' || v === 'm') ? 0.5 : 1;
+    });
+    const diasDetalle = Object.keys(asis).sort((a, b) => a - b).map(d => d + ':' + asis[d]).join(',');
+    const diasMatriz  = Object.values(asis).reduce((s, v) => s + v, 0);
+
     const pagoDiaN = parseFloat(pagoDia) || 0;
     const movDiaN  = parseFloat(movDia)  || 0;
     const movAdN   = parseFloat(movAd)   || 0;
@@ -4818,6 +4831,8 @@ async function procesarExcelCarga(file) {
     const adelantoN= parseFloat(adelanto)|| 0;
     const megasN   = parseFloat(megas)   || 0;
     const otrosN   = parseFloat(otros)   || 0;
+    // Si llenaron la matriz de días, ese es el total; si no, usar la columna "Días"
+    const diasN    = diasMatriz > 0 ? diasMatriz : (parseFloat(dias) || 0);
     const pagoDias = diasN * pagoDiaN;
     const movilidad= diasN * movDiaN;
     const total    = pagoDias + movilidad + movAdN + movViN + megasN + otrosN - adelantoN;
@@ -4845,7 +4860,7 @@ async function procesarExcelCarga(file) {
     cargaFilas.push({
       quincena, cliente, proyecto, supervisor,
       ejCuentas: String(ejCuentas||'').trim(),
-      dni: String(dni).trim(), dias: diasN, pagoDia: pagoDiaN,
+      dni: String(dni).trim(), dias: diasN, diasDetalle: diasDetalle, pagoDia: pagoDiaN,
       pagoDias, movilidadDia: movDiaN, movilidad: movilidad,
       movAdicional: movAdN, movViajera: movViN,
       adelanto: adelantoN, megas: megasN, otros: otrosN,
@@ -4974,7 +4989,7 @@ async function confirmarCargaMasiva() {
       supervisor: f.supervisor, ejCuentas: f.ejCuentas || '',
       nombre: f.nombre, dni: f.dni,
       departamento: f.departamento, ciudad: f.ciudad, banco: f.banco,
-      cuenta: f.cuenta, cci: f.cci, dias: f.dias, pagoDia: f.pagoDia,
+      cuenta: f.cuenta, cci: f.cci, dias: f.dias, diasDetalle: f.diasDetalle || '', pagoDia: f.pagoDia,
       pagoDias: f.pagoDias, movilidadDia: f.movilidadDia, movilidad: f.movilidad,
       movAdicional: f.movAdicional, movViajera: f.movViajera,
       adelanto: f.adelanto, megas: f.megas, otros: f.otros,
@@ -5021,11 +5036,19 @@ function limpiarCarga() {
 }
 
 function descargarPlantilla() {
-  const headers = ['Quincena','Cliente','Proyecto','Supervisor','Ej. Cuentas','DNI',
+  const baseHeaders = ['Quincena','Cliente','Proyecto','Supervisor','Ej. Cuentas','DNI',
                    'Días','Pago/día','Mov.diaria','Mov.adicional',
                    'Mov.viajera','Adelanto','Megas','Otros'];
-  const ejemplo = ['Q1-ABR-2026','BAT','SS MERCH','JOSÉ MARIÑOS','PEDRO PÉREZ','12345678',
-                   15, 80, 10, 0, 0, 0, 15, 0];
+  const dayHeaders = [];
+  for (let d = 1; d <= 31; d++) dayHeaders.push('Día ' + d);
+  const headers = baseHeaders.concat(dayHeaders);
+
+  // "Días" va vacío: se calcula solo desde la matriz de días. Ejemplo Q1: días 1–15 trabajados.
+  const baseEjemplo = ['Q1-ABR-2026','BAT','SS MERCH','JOSÉ MARIÑOS','PEDRO PÉREZ','12345678',
+                   '', 80, 10, 0, 0, 0, 15, 0];
+  const dayEjemplo = [];
+  for (let d = 1; d <= 31; d++) dayEjemplo.push(d <= 15 ? 1 : '');
+  const ejemplo = baseEjemplo.concat(dayEjemplo);
 
   if (typeof XLSX !== 'undefined') {
     const wb = XLSX.utils.book_new();
