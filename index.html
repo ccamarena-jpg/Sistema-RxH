@@ -3426,7 +3426,7 @@ function verDetalle(id) {
   let movBase = parsearTotal(r.movilidad);
   if (!movBase) movBase = dias * parsearTotal(r.movilidadDia);
   // Emisor(es) del RxH — mismo parseo que la tabla de RxH
-  const emisores = (r.numRxh||'').split('|').map(x => (x.split('::')[3]||'').trim()).filter(Boolean).join(', ');
+  const emisores = (r.rxhDetalle || r.numRxh || '').split('|').map(x => (x.split('::')[3]||'').trim()).filter(Boolean).join(', ');
   document.getElementById('modal-det-title').textContent = r.nombre;
   document.getElementById('modal-det-content').innerHTML = `
     <table style="width:100%;border-collapse:collapse">
@@ -3700,8 +3700,9 @@ function renderTablaRxH() {
 
   tbody.innerHTML = filtrada.map(r => {
     const rxhCount = r.numRxh ? r.numRxh.split(',').filter(Boolean).length : 0;
-    // Parsear RxH items para mostrar en tabla
-    const items = r.numRxh ? r.numRxh.split('|').filter(Boolean).map(item => {
+    // Parsear RxH items para mostrar en tabla (detalle completo: num::fecha::monto::emisor)
+    const _detTabla = r.rxhDetalle || r.numRxh || '';
+    const items = _detTabla ? _detTabla.split('|').filter(Boolean).map(item => {
       const p = item.split('::');
       return { num: p[0]||'', fecha: p[1]||'', monto: p[2]||'', emisor: p[3]||'' };
     }) : [];
@@ -3740,7 +3741,8 @@ function abrirModalRxH(id) {
   const r = registros.find(x => x.id === id);
   if (!r) return;
   rxhModalTarget = r;
-  rxhItems = r.numRxh ? r.numRxh.split('|').filter(Boolean).map(item => {
+  const _detEdit = r.rxhDetalle || r.numRxh || '';
+  rxhItems = _detEdit ? _detEdit.split('|').filter(Boolean).map(item => {
     const parts = item.split('::');
     return { num: parts[0]||'', fecha: parts[1]||'', monto: parts[2]||'', emisor: parts[3]||'' };
   }) : [];
@@ -3901,7 +3903,7 @@ function previsualizarReporte() {
     // Mostrar todos los números de recibo separados por coma
     const recibos = (r.numRxh||'').split('|').map(x => x.split('::')[0].trim()).filter(Boolean).join(', ');
     // Emisor(es) del RxH — mismo parseo que la tabla de RxH (num::fecha::monto::emisor)
-    const emisores = (r.numRxh||'').split('|').map(x => (x.split('::')[3]||'').trim()).filter(Boolean).join(', ');
+    const emisores = (r.rxhDetalle || r.numRxh || '').split('|').map(x => (x.split('::')[3]||'').trim()).filter(Boolean).join(', ');
     return `<tr>
       <td style="color:var(--text-dim)">${i+1}</td>
       <td><strong>${r.nombre}</strong></td>
@@ -3942,7 +3944,7 @@ function exportarExcel() {
     const cuentaLimpia = String(r.cuenta||'').replace(/\.0+$/,'').trim();
     const cciLimpia    = String(r.cci   ||'').replace(/\.0+$/,'').trim();
     const recibos      = (r.numRxh||'').split('|').map(x=>x.split('::')[0].trim()).filter(Boolean).join(', ');
-    const emisores     = (r.numRxh||'').split('|').map(x=>(x.split('::')[3]||'').trim()).filter(Boolean).join(', ');
+    const emisores     = (r.rxhDetalle || r.numRxh || '').split('|').map(x=>(x.split('::')[3]||'').trim()).filter(Boolean).join(', ');
     return [
       i+1,
       r.nombre,
