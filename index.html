@@ -311,6 +311,7 @@
   .pill-rxh          { background: rgba(232,197,71,0.15); color: var(--accent); }
   .pill-contabilidad { background: rgba(91,141,238,0.15); color: var(--blue); }
   .pill-obs-cont     { background: rgba(224,130,50,0.15); color: var(--orange); }
+  .pill-rxh-aprob    { background: rgba(14,138,138,0.15); color: #0e8a8a; }
   .pill-pagado       { background: rgba(76,175,125,0.2); color: var(--green); }
 
   /* ── APPROVAL PANEL ── */
@@ -1147,12 +1148,12 @@
       <div class="stat-value red" id="cont-stat-revision">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">RxH validados</div>
-      <div class="stat-value green" id="cont-stat-validados">0</div>
+      <div class="stat-label">RxH aprobados</div>
+      <div class="stat-value" style="color:#0e8a8a" id="cont-stat-validados">0</div>
     </div>
     <div class="stat-card">
-      <div class="stat-label">Observados</div>
-      <div class="stat-value" style="color:var(--orange)" id="cont-stat-obs">0</div>
+      <div class="stat-label">Pagados</div>
+      <div class="stat-value green" id="cont-stat-obs">0</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Total quincena</div>
@@ -1185,6 +1186,16 @@
         <option value="">Todos</option>
       </select>
     </div>
+    <div class="field" style="margin:0;min-width:150px">
+      <label style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Estado</label>
+      <select id="cont-fil-estado" onchange="renderTablaContabilidad()" style="width:100%;padding:7px 12px;border-radius:6px;border:1px solid var(--border);font-size:13px;background:#fff;color:var(--text)">
+        <option value="">Todos</option>
+        <option value="EN REVISIÓN CONTABILIDAD">En contabilidad</option>
+        <option value="APROBADO CONTABILIDAD">RxH Aprobado</option>
+        <option value="OBSERVADO-CONTABILIDAD">Observado</option>
+        <option value="PAGADO">Pagado</option>
+      </select>
+    </div>
     <button onclick="limpiarFiltrosCont()" style="padding:7px 16px;border-radius:6px;border:1px solid var(--border);background:#fff;font-size:12px;color:var(--text-muted);cursor:pointer;margin-top:16px">✕ Limpiar</button>
   </div>
 
@@ -1192,7 +1203,7 @@
     <button id="btn-aprobar-sel-cont" onclick="aprobarSeleccionados('contabilidad')"
       style="display:none;background:var(--navy);color:#fff;border:none;border-radius:8px;
       padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer">
-      ✓ Validar seleccionados (<span id="count-sel-cont">0</span>)
+      ✓ Aprobar RxH seleccionados (<span id="count-sel-cont">0</span>)
     </button>
     <button onclick="exportarTablaContabilidad()"
       style="background:#fff;color:var(--navy);border:1px solid var(--navy);border-radius:8px;
@@ -1957,6 +1968,7 @@ function doGet(e) {
             <option value="APROBADO CUENTAS">Aprobado por Cuentas</option>
             <option value="OBSERVADO-CUENTAS">Observado por Cuentas</option>
             <option value="RXH">RxH ingresado</option>
+            <option value="APROBADO CONTABILIDAD">RxH Aprobado</option>
             <option value="OBSERVADO-CONTABILIDAD">Obs. Contabilidad</option>
             <option value="PAGADO">Pagado</option>
           </select>
@@ -2840,6 +2852,7 @@ const ESTADO_PILL = {
   'APROBADO CUENTAS':       '<span class="status-pill pill-aprobado-c">Aprobado</span>',
   'RXH SOLICITADO':         '<span class="status-pill pill-rxh">RxH solicitado</span>',
   'EN REVISIÓN CONTABILIDAD':'<span class="status-pill pill-contabilidad">En contabilidad</span>',
+  'APROBADO CONTABILIDAD':  '<span class="status-pill pill-rxh-aprob">RxH Aprobado</span>',
   'OBSERVADO-CONTABILIDAD': '<span class="status-pill pill-obs-cont">Obs. contab.</span>',
   'PAGADO':                 '<span class="status-pill pill-pagado">Pagado</span>',
 };
@@ -2912,7 +2925,7 @@ function exportarTablaContabilidad() {
   const filS     = (document.getElementById('cont-fil-supervisor') ? document.getElementById('cont-fil-supervisor').value : '') || '';
 
   const lista = registros.filter(r => {
-    if (!['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado)) return false;
+    if (!['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','APROBADO CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado)) return false;
     if (filQ && r.quincena  !== filQ) return false;
     if (filC && r.cliente   !== filC) return false;
     if (filP && r.proyecto  !== filP) return false;
@@ -3071,7 +3084,7 @@ function renderTablaAprobacion(filtro) {
     if (filAprob && (r.aprobadoPor||'').trim() !== filAprob.trim()) return false;
     if (filtro === 'revision')  return ['EN REVISIÓN CUENTAS'].includes(r.estado);
     if (filtro === 'observado') return ['OBSERVADO-CUENTAS'].includes(r.estado);
-    if (filtro === 'aprobado')  return ['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado);
+    if (filtro === 'aprobado')  return ['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','APROBADO CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado);
     return true;
   });
 
@@ -3106,7 +3119,7 @@ function renderTablaAprobacion(filtro) {
 
   // Stats sobre lista filtrada
   document.getElementById('apro-stat-pendientes').textContent = lista.filter(r=>r.estado==='EN REVISIÓN CUENTAS').length;
-  document.getElementById('apro-stat-aprobados').textContent  = lista.filter(r=>['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','PAGADO'].includes(r.estado)).length;
+  document.getElementById('apro-stat-aprobados').textContent  = lista.filter(r=>['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','APROBADO CONTABILIDAD','PAGADO'].includes(r.estado)).length;
   document.getElementById('apro-stat-observados').textContent = lista.filter(r=>r.estado==='OBSERVADO-CUENTAS').length;
   const tot = lista.reduce((s,r)=>s+parsearTotal(r.total),0);
   document.getElementById('apro-stat-total').textContent = 'S/. ' + tot.toLocaleString('es-PE',{minimumFractionDigits:0});
@@ -3192,13 +3205,13 @@ function renderMisRegistros() {
     if (filP && r.proyecto !== filP) return false;
     if (misFiltroActivo === 'revision')  return r.estado === 'EN REVISIÓN CUENTAS';
     if (misFiltroActivo === 'observado') return r.estado === 'OBSERVADO-CUENTAS';
-    if (misFiltroActivo === 'aprobado')  return ['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado);
+    if (misFiltroActivo === 'aprobado')  return ['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','APROBADO CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado);
     return true;
   });
 
   // Stats
   document.getElementById('mis-stat-revision')  && (document.getElementById('mis-stat-revision').textContent  = base.filter(r=>r.estado==='EN REVISIÓN CUENTAS').length);
-  document.getElementById('mis-stat-aprobados') && (document.getElementById('mis-stat-aprobados').textContent = base.filter(r=>['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','PAGADO'].includes(r.estado)).length);
+  document.getElementById('mis-stat-aprobados') && (document.getElementById('mis-stat-aprobados').textContent = base.filter(r=>['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','APROBADO CONTABILIDAD','PAGADO'].includes(r.estado)).length);
   document.getElementById('mis-stat-observados') && (document.getElementById('mis-stat-observados').textContent = base.filter(r=>r.estado==='OBSERVADO-CUENTAS').length);
   const tot = base.reduce((s,r)=>s+parsearTotal(r.total),0);
   document.getElementById('mis-stat-total') && (document.getElementById('mis-stat-total').textContent = 'S/. ' + tot.toLocaleString('es-PE',{minimumFractionDigits:0}));
@@ -3305,7 +3318,7 @@ function poblarFiltrosCont() {
   const selS = document.getElementById('cont-fil-supervisor');
   if (!selQ) return;
 
-  const base = registros.filter(r => ['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado));
+  const base = registros.filter(r => ['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','APROBADO CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado));
   const prevQ = selQ.value, prevC = selC.value, prevS = selS.value;
 
   const quincenas    = [...new Set(base.map(r=>r.quincena).filter(Boolean))].sort().reverse();
@@ -3333,7 +3346,7 @@ function contFiltrarCliente() {
   const cliente = (document.getElementById('cont-fil-cliente') ? document.getElementById('cont-fil-cliente').value : '') || '';
   const selP    = document.getElementById('cont-fil-proyecto');
   if (!selP) return;
-  const base = registros.filter(r => ['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado));
+  const base = registros.filter(r => ['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','APROBADO CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado));
   const proyectos = [...new Set(base.filter(r => !cliente || r.cliente === cliente).map(r=>r.proyecto).filter(Boolean))].sort();
   selP.innerHTML = '<option value="">Todos</option>';
   proyectos.forEach(p => selP.innerHTML += `<option>${p}</option>`);
@@ -3341,7 +3354,7 @@ function contFiltrarCliente() {
 }
 
 function limpiarFiltrosCont() {
-  ['cont-fil-quincena','cont-fil-cliente','cont-fil-proyecto','cont-fil-supervisor']
+  ['cont-fil-quincena','cont-fil-cliente','cont-fil-proyecto','cont-fil-supervisor','cont-fil-estado']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   renderTablaContabilidad();
 }
@@ -3352,6 +3365,7 @@ function renderTablaContabilidad() {
   const filC = (document.getElementById('cont-fil-cliente') ? document.getElementById('cont-fil-cliente').value : '')    || '';
   const filP = (document.getElementById('cont-fil-proyecto') ? document.getElementById('cont-fil-proyecto').value : '')   || '';
   const filS = (document.getElementById('cont-fil-supervisor') ? document.getElementById('cont-fil-supervisor').value : '') || '';
+  const filE = (document.getElementById('cont-fil-estado') ? document.getElementById('cont-fil-estado').value : '') || '';
 
   poblarFiltrosCont();
 
@@ -3360,15 +3374,17 @@ function renderTablaContabilidad() {
   if (filC) document.getElementById('cont-fil-cliente').value   = filC;
   if (filP) document.getElementById('cont-fil-proyecto').value  = filP;
   if (filS) document.getElementById('cont-fil-supervisor').value = filS;
+  if (filE) document.getElementById('cont-fil-estado').value    = filE;
 
   const tbody = document.getElementById('tbody-contabilidad');
 
   let lista = registros.filter(r => {
-    if (!['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado)) return false;
+    if (!['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','APROBADO CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado)) return false;
     if (filQ && r.quincena   !== filQ) return false;
     if (filC && r.cliente    !== filC) return false;
     if (filP && r.proyecto   !== filP) return false;
     if (filS && !esMismoSupervisor(r.supervisor, filS)) return false;
+    if (filE && r.estado     !== filE) return false;
     return true;
   });
 
@@ -3400,11 +3416,15 @@ function renderTablaContabilidad() {
         <td>
           <div class="action-btns">
             ${['EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD'].includes(r.estado) ? `
-              <button class="act-btn act-approve" onclick="aprobarContabilidad(${r.id})">Validar</button>
+              <button class="act-btn act-approve" onclick="aprobarContabilidad(${r.id})">Aprobar RxH</button>
+              <button class="act-btn act-observe" onclick="abrirObservacion(${r.id},'contabilidad')">Observar</button>
+            ` : ''}
+            ${r.estado === 'APROBADO CONTABILIDAD' ? `
+              <button class="act-btn act-approve" onclick="marcarPagado(${r.id})">Marcar pagado</button>
               <button class="act-btn act-observe" onclick="abrirObservacion(${r.id},'contabilidad')">Observar</button>
             ` : ''}
             ${r.estado === 'PAGADO' ? `
-              <button class="act-btn act-revert" onclick="revertirContabilidad(${r.id})" title="Revertir aprobación">↩ Revertir</button>
+              <button class="act-btn act-revert" onclick="revertirContabilidad(${r.id})" title="Revertir pago">↩ Revertir</button>
             ` : ''}
             <button class="act-btn act-view" onclick="verDetalle(${r.id})">Ver</button>
           </div>
@@ -3416,18 +3436,33 @@ function renderTablaContabilidad() {
 
   // Stats dinámicos
   document.getElementById('cont-stat-revision').textContent  = lista.filter(r=>r.estado==='EN REVISIÓN CONTABILIDAD').length;
-  document.getElementById('cont-stat-validados').textContent = lista.filter(r=>r.estado==='PAGADO').length;
-  document.getElementById('cont-stat-obs').textContent       = lista.filter(r=>r.estado==='OBSERVADO-CONTABILIDAD').length;
+  document.getElementById('cont-stat-validados').textContent = lista.filter(r=>r.estado==='APROBADO CONTABILIDAD').length;
+  document.getElementById('cont-stat-obs').textContent       = lista.filter(r=>r.estado==='PAGADO').length;
   const tot = lista.reduce((s,r)=>s+parsearTotal(r.total),0);
   document.getElementById('cont-stat-total').textContent = 'S/. ' + tot.toLocaleString('es-PE',{minimumFractionDigits:0});
 }
 
+// Paso 1 — Contabilidad aprueba el RxH (aún NO significa que se pagará)
 async function aprobarContabilidad(id) {
+  const r = registros.find(x=>x.id===id);
+  if (!r) return;
+  r.estado = 'APROBADO CONTABILIDAD';
+  renderTablaContabilidad();
+  showToast('✓ RxH aprobado por Contabilidad');
+  if (SCRIPT_URL) {
+    fetchScript({accion:'actualizar', fila:r.fila, tipo:'contabilidad', estado:'APROBADO CONTABILIDAD'});
+    // Notificar al supervisor que su RxH fue aprobado (pendiente de pago)
+    notificarPorEmail('aprobado_contabilidad', r, Object.keys(SUPERVISORES_MAP).find(k => SUPERVISORES_MAP[k] === r.supervisor) || '');
+  }
+}
+
+// Paso 2 — Contabilidad confirma el pago efectivo del RxH aprobado
+async function marcarPagado(id) {
   const r = registros.find(x=>x.id===id);
   if (!r) return;
   r.estado = 'PAGADO';
   renderTablaContabilidad();
-  showToast('✓ RxH validado por Contabilidad');
+  showToast('✓ RxH marcado como pagado');
   if (SCRIPT_URL) {
     fetchScript({accion:'actualizar', fila:r.fila, tipo:'contabilidad', estado:'PAGADO'});
     // Notificar al supervisor que su registro fue pagado
@@ -4250,8 +4285,8 @@ function getFiltrados() {
   const cliente  = document.getElementById('exp-cliente').value;
   const proyecto = document.getElementById('exp-proyecto').value;
   return registros.filter(r => {
-    // Solo registros aprobados por Contabilidad (PAGADO) para el reporte de banco
-    const estadoOk = r.estado === 'PAGADO';
+    // Solo RxH aprobados por Contabilidad y aún NO pagados (listos para pagar en banco)
+    const estadoOk = r.estado === 'APROBADO CONTABILIDAD';
     const qOk  = !quincena || r.quincena === quincena;
     const cOk  = !cliente  || r.cliente  === cliente;
     const pOk  = !proyecto || r.proyecto === proyecto;
@@ -4266,7 +4301,7 @@ function previsualizarReporte() {
   const stats = document.getElementById('exp-stats');
 
   if (!lista.length) {
-    showToast('No hay registros PAGADOS con ese filtro', true);
+    showToast('No hay RxH aprobados (pendientes de pago) con ese filtro', true);
     card.style.display = 'none';
     return;
   }
@@ -4401,6 +4436,7 @@ const ADMINS_EJCUENTAS_MAP = {
   'rpulido@ttaudit.com':      'RAUL PULIDO',
   'apablo@ttaudit.com':       '',
   'contabilidad@ttaudit.com': '',
+  'contabilidad2@ttaudit.com':'',
   'egutierrez@ttaudit.com':   '',
 };
 
@@ -5162,7 +5198,7 @@ function construirLogAuditoria() {
     });
     // Aprobación Cuentas
     if (['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD',
-         'OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado) ||
+         'APROBADO CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado) ||
         r.aprobadoPor) {
       eventos.push({
         fecha: r.fecha, nombre: r.nombre, dni: r.dni,
@@ -5196,6 +5232,14 @@ function construirLogAuditoria() {
         proyecto: r.proyecto, quincena: r.quincena,
         evento: 'OBSERVADO-CONTABILIDAD',
         quien: 'Contabilidad', nota: r.obsCont
+      });
+    }
+    // RxH Aprobado por Contabilidad (aprobado o ya pagado)
+    if (r.estado === 'APROBADO CONTABILIDAD' || r.estado === 'PAGADO') {
+      eventos.push({
+        fecha: r.fecha, nombre: r.nombre, dni: r.dni,
+        proyecto: r.proyecto, quincena: r.quincena,
+        evento: 'APROBADO CONTABILIDAD', quien: 'Contabilidad', nota: ''
       });
     }
     // Pagado
@@ -5347,7 +5391,7 @@ function exportarDatosCuentas() {
   // Aplicar también el filtro de estado activo
   if (aprobacionFiltroActivo === 'revision')  lista = lista.filter(r => r.estado === 'EN REVISIÓN CUENTAS');
   if (aprobacionFiltroActivo === 'observado') lista = lista.filter(r => r.estado === 'OBSERVADO-CUENTAS');
-  if (aprobacionFiltroActivo === 'aprobado')  lista = lista.filter(r => ['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado));
+  if (aprobacionFiltroActivo === 'aprobado')  lista = lista.filter(r => ['APROBADO CUENTAS','RXH SOLICITADO','EN REVISIÓN CONTABILIDAD','APROBADO CONTABILIDAD','OBSERVADO-CONTABILIDAD','PAGADO'].includes(r.estado));
 
   if (!lista.length) { showToast('No hay registros para exportar con los filtros actuales', true); return; }
 
