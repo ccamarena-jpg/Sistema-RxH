@@ -4376,11 +4376,26 @@ function previsualizarReporte() {
   showToast(`✓ ${lista.length} registros listos para exportar`);
 }
 
-function exportarExcel() {
+async function exportarExcel() {
   const lista = getFiltrados();
   if (!lista.length) {
     showToast('Primero haz una vista previa o no hay registros', true);
     return;
+  }
+
+  // Cargar SheetJS bajo demanda si aún no está disponible
+  if (typeof XLSX === 'undefined') {
+    try {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    } catch (e) {
+      showToast('No se pudo cargar el generador de Excel. Revisa tu conexión.', true);
+      return;
+    }
   }
 
   const quincena = document.getElementById('exp-quincena').value || 'TODOS';
@@ -4415,6 +4430,35 @@ function exportarExcel() {
     ];
   });
 
+  // === Exportar como archivo .xlsx real (SheetJS) ===
+  // La cuenta bancaria y el CCI caen como TEXTO, para que no se modifiquen
+  // (sin notación científica ni pérdida de ceros a la izquierda).
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  const colsTexto = [2, 3, 4, 5, 6, 7, 13];  // DNI, códigos, N° cuenta, N° CCI, N° recibo
+  const colMonto  = 9;                        // MONTO TOTAL
+  for (let f = 1; f <= rows.length; f++) {     // f=1 salta la fila de encabezados
+    colsTexto.forEach(cIdx => {
+      const cell = ws[XLSX.utils.encode_cell({ c: cIdx, r: f })];
+      if (cell) { cell.t = 's'; cell.z = '@'; cell.v = String(cell.v == null ? '' : cell.v); }
+    });
+    const celMonto = ws[XLSX.utils.encode_cell({ c: colMonto, r: f })];
+    if (celMonto) { const n = Number(celMonto.v); if (!isNaN(n)) { celMonto.t = 'n'; celMonto.v = n; celMonto.z = '0.00'; } }
+  }
+  ws['!cols'] = [
+    {wch:5},{wch:32},{wch:12},{wch:6},{wch:6},{wch:6},
+    {wch:22},{wch:24},{wch:6},{wch:12},{wch:16},{wch:20},
+    {wch:12},{wch:16},{wch:24}
+  ];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Pagos');
+  XLSX.writeFile(wb, `Reporte_Pagos_${quincena}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast('Excel descargado - la cuenta bancaria cae como texto');
+}
+
+function __exportarExcel_csv_legacy_no_usar() {
+  // Versión CSV anterior — reemplazada por la exportación .xlsx de arriba.
+  // Se conserva solo como referencia y no se invoca desde ningún botón.
+  const headers = [], rows = [], quincena = '';
   const csvContent = [headers, ...rows]
     .map(row => row.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(','))
     .join('\n');
