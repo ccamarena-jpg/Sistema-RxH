@@ -1205,6 +1205,11 @@
       padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer">
       ✓ Aprobar RxH seleccionados (<span id="count-sel-cont">0</span>)
     </button>
+    <button id="btn-pagar-sel-cont" onclick="marcarPagadosSeleccionados()"
+      style="display:none;background:var(--green);color:#fff;border:none;border-radius:8px;
+      padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;margin-left:8px">
+      💳 Marcar pagados seleccionados (<span id="count-sel-cont-pago">0</span>)
+    </button>
     <button onclick="exportarTablaContabilidad()"
       style="background:#fff;color:var(--navy);border:1px solid var(--navy);border-radius:8px;
       padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;margin-left:auto">
@@ -2893,11 +2898,19 @@ function toggleAllCuentas(el) {
 }
 
 function actualizarContadorCont() {
-  const checked = document.querySelectorAll('.chk-cont:checked').length;
-  const btn = document.getElementById('btn-aprobar-sel-cont');
-  const cnt = document.getElementById('count-sel-cont');
-  if (btn) { btn.style.display = checked > 0 ? 'inline-block' : 'none'; }
-  if (cnt) cnt.textContent = checked;
+  const checks   = [...document.querySelectorAll('.chk-cont:checked')];
+  const nApro = checks.filter(c => ['EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD'].includes(c.dataset.estado)).length;
+  const nPago = checks.filter(c => c.dataset.estado === 'APROBADO CONTABILIDAD').length;
+
+  const btnA = document.getElementById('btn-aprobar-sel-cont');
+  const cntA = document.getElementById('count-sel-cont');
+  if (btnA) btnA.style.display = nApro > 0 ? 'inline-block' : 'none';
+  if (cntA) cntA.textContent = nApro;
+
+  const btnP = document.getElementById('btn-pagar-sel-cont');
+  const cntP = document.getElementById('count-sel-cont-pago');
+  if (btnP) btnP.style.display = nPago > 0 ? 'inline-block' : 'none';
+  if (cntP) cntP.textContent = nPago;
 }
 
 function toggleAllCont(el) {
@@ -2906,16 +2919,32 @@ function toggleAllCont(el) {
 }
 
 async function aprobarSeleccionados(panel) {
-  const cls    = panel === 'cuentas' ? '.chk-aprobacion:checked' : '.chk-cont:checked';
-  const checks = document.querySelectorAll(cls);
-  if (!checks.length) return;
-
-  const ids = [...checks].map(c => parseInt(c.dataset.id));
-  for (const id of ids) {
-    if (panel === 'cuentas') await aprobarCuentas(id);
-    else await aprobarContabilidad(id);
+  if (panel === 'cuentas') {
+    const checks = document.querySelectorAll('.chk-aprobacion:checked');
+    if (!checks.length) return;
+    const ids = [...checks].map(c => parseInt(c.dataset.id));
+    for (const id of ids) await aprobarCuentas(id);
+    showToast(`✓ ${ids.length} registros aprobados`);
+    return;
   }
-  showToast(`✓ ${ids.length} registros aprobados`);
+  // Contabilidad: aprobar solo los seleccionados que están pendientes de aprobar
+  const checks = [...document.querySelectorAll('.chk-cont:checked')]
+    .filter(c => ['EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD'].includes(c.dataset.estado));
+  if (!checks.length) return;
+  const ids = checks.map(c => parseInt(c.dataset.id));
+  for (const id of ids) await aprobarContabilidad(id);
+  showToast(`✓ ${ids.length} RxH aprobados`);
+}
+
+// Marcar como pagados en lote los RxH aprobados seleccionados
+async function marcarPagadosSeleccionados() {
+  const checks = [...document.querySelectorAll('.chk-cont:checked')]
+    .filter(c => c.dataset.estado === 'APROBADO CONTABILIDAD');
+  if (!checks.length) return;
+  const ids = checks.map(c => parseInt(c.dataset.id));
+  if (!confirm(`¿Marcar como PAGADOS ${ids.length} RxH aprobado(s)?`)) return;
+  for (const id of ids) await marcarPagado(id);
+  showToast(`💳 ${ids.length} RxH marcados como pagados`);
 }
 
 function exportarTablaContabilidad() {
@@ -3393,8 +3422,8 @@ function renderTablaContabilidad() {
   } else {
     tbody.innerHTML = lista.map(r => `
       <tr>
-        <td><input type="checkbox" class="chk-cont" data-id="${r.id}"
-          ${!['EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD'].includes(r.estado) ? 'disabled style="opacity:0.3"' : ''}
+        <td><input type="checkbox" class="chk-cont" data-id="${r.id}" data-estado="${r.estado}"
+          ${!['EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','APROBADO CONTABILIDAD'].includes(r.estado) ? 'disabled style="opacity:0.3"' : ''}
           onchange="actualizarContadorCont()"></td>
         <td><strong>${r.nombre}</strong><br><span style="color:var(--text-dim);font-size:11px">${r.dni}</span></td>
         <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span></td>
