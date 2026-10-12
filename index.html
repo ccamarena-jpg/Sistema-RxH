@@ -796,7 +796,7 @@
         <div id="f-cci-error" style="display:none;font-size:11px;color:var(--red);margin-top:4px">⚠ Debe tener exactamente 20 dígitos</div>
       </div>
       <div class="field span-2">
-        <label>CECO <span style="font-size:10px;color:var(--text-dim)">(centro de costos)</span></label>
+        <label>CECO <span style="color:var(--red)">*</span> <span style="font-size:10px;color:var(--text-dim)">(centro de costos)</span></label>
         <input type="text" id="f-ceco" placeholder="Ej. 1001234" autocomplete="off">
       </div>
     </div>
@@ -1421,6 +1421,7 @@
           <th>Banco</th>
           <th>N° Recibo</th>
           <th>Emisor RxH</th>
+          <th>CECO</th>
         </tr>
       </thead>
       <tbody id="exp-tbody"></tbody>
@@ -2716,7 +2717,7 @@ function calcularTotal() {
 
 // ── GUARDAR REGISTRO ──
 async function guardarRegistro() {
-  const req = ['f-quincena','f-cliente','f-proyecto','f-supervisor','f-dni','f-nombre'];
+  const req = ['f-quincena','f-cliente','f-proyecto','f-supervisor','f-dni','f-nombre','f-ceco'];
   for (const id of req) {
     if (!document.getElementById(id).value.trim()) {
       showToast('Completa todos los campos obligatorios', true); return;
@@ -3130,7 +3131,7 @@ function renderTablaAprobacion(filtro) {
         <td>${currentUser && currentUser.role === 'supervisor' ? '' : '<input type="checkbox" class="chk-aprobacion" data-id="'+r.id+'" '+(r.estado !== 'EN REVISIÓN CUENTAS' ? 'disabled style="opacity:0.3"' : '')+' onchange="actualizarContadorCuentas()">'}</td>
         <td>${r.supervisor || '—'}</td>
         <td><strong>${r.nombre}</strong><br><span style="color:var(--text-dim);font-size:11px">${r.dni}</span></td>
-        <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span></td>
+        <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span>${r.ceco ? `<br><span style="font-size:11px;color:var(--text-muted)">CECO: ${r.ceco}</span>` : ''}</td>
         <td>${r.ciudad}</td>
         <td style="font-weight:600;color:var(--accent)">S/. ${parseFloat(r.total||0).toLocaleString('es-PE',{minimumFractionDigits:2})}</td>
         <td>${ESTADO_PILL[r.estado] || r.estado}</td>
@@ -3269,7 +3270,7 @@ function renderMisRegistros() {
     return `<tr ${esObservado ? 'style="background:rgba(217,115,32,0.05)"' : ''}>
       <td style="white-space:nowrap">${r.quincena || '—'}</td>
       <td><strong>${r.nombre}</strong><br><span style="font-size:11px;color:var(--text-dim)">${r.dni}</span></td>
-      <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span></td>
+      <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span>${r.ceco ? `<br><span style="font-size:11px;color:var(--text-muted)">CECO: ${r.ceco}</span>` : ''}</td>
       <td>${r.ciudad || '—'}</td>
       <td style="text-align:right">${fmt(honorarios)}</td>
       <td style="text-align:right">${fmt(movilidad)}</td>
@@ -3431,7 +3432,7 @@ function renderTablaContabilidad() {
           ${!['EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','APROBADO CONTABILIDAD'].includes(r.estado) ? 'disabled style="opacity:0.3"' : ''}
           onchange="actualizarContadorCont()"></td>
         <td><strong>${r.nombre}</strong><br><span style="color:var(--text-dim);font-size:11px">${r.dni}</span></td>
-        <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span></td>
+        <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span>${r.ceco ? `<br><span style="font-size:11px;color:var(--text-muted)">CECO: ${r.ceco}</span>` : ''}</td>
         <td>${r.supervisor || '—'}</td>
         <td style="font-weight:600;color:var(--accent)">S/. ${parseFloat(r.total||0).toLocaleString('es-PE',{minimumFractionDigits:2})}</td>
         <td>${(() => {
@@ -3662,6 +3663,7 @@ function verDetalle(id) {
         ['Ciudad', r.ciudad],
         ['DNI', r.dni],
         ['Banco', r.banco],
+        ['CECO', r.ceco || '—'],
         ['N° Cuenta', r.cuenta || '—'],
         ['N° CCI', r.cci || '—'],
         ['Días trabajados', r.dias || '0'],
@@ -4176,7 +4178,7 @@ function renderTablaRxH() {
             <span>⚠</span><span><strong>Obs. Contabilidad:</strong> ${r.obsCont}</span>
           </div>` : ''}
       </td>
-      <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span></td>
+      <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span>${r.ceco ? `<br><span style="font-size:11px;color:var(--text-muted)">CECO: ${r.ceco}</span>` : ''}</td>
       <td>${r.supervisor || '—'}</td>
       <td style="font-weight:600;color:var(--navy)">S/. ${parseFloat(r.total||0).toLocaleString('es-PE',{minimumFractionDigits:2})}</td>
       <td style="font-size:13px">${numRxhCell}</td>
@@ -4374,6 +4376,7 @@ function previsualizarReporte() {
       <td>${r.banco}</td>
       <td style="font-size:12px">${recibos || '<span style="color:var(--orange)">Pendiente</span>'}</td>
       <td style="font-size:12px">${emisores || '—'}</td>
+      <td style="font-size:12px">${r.ceco || '—'}</td>
     </tr>`;
   }).join('');
 
@@ -4408,7 +4411,7 @@ async function exportarExcel() {
   const headers = [
     'N°','APELLIDOS Y NOMBRE','DNI','TIPO DE ABONO',
     'TIPO DE CUENTA','MONEDA DE CUENTA','N° CUENTA BANCARIA','N° CUENTA INTERBANCARIA (CCI)',
-    'MONEDA DE ABONO','MONTO TOTAL','BANCO','PROYECTO','QUINCENA','N° RECIBO','EMISOR RXH'
+    'MONEDA DE ABONO','MONTO TOTAL','BANCO','PROYECTO','QUINCENA','N° RECIBO','EMISOR RXH','CECO'
   ];
 
   const rows = lista.map((r,i) => {
@@ -4431,7 +4434,8 @@ async function exportarExcel() {
       r.proyecto,
       r.quincena,
       recibos,
-      emisores
+      emisores,
+      r.ceco || ''
     ];
   });
 
@@ -4452,7 +4456,7 @@ async function exportarExcel() {
   ws['!cols'] = [
     {wch:5},{wch:32},{wch:12},{wch:6},{wch:6},{wch:6},
     {wch:22},{wch:24},{wch:6},{wch:12},{wch:16},{wch:20},
-    {wch:12},{wch:16},{wch:24}
+    {wch:12},{wch:16},{wch:24},{wch:14}
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Pagos');
@@ -5029,6 +5033,7 @@ async function procesarExcelCarga(file) {
     if (!cliente)  problemas.push('Sin cliente');
     if (!proyecto) problemas.push('Sin proyecto');
     if (!String(dni).trim()) problemas.push('Sin DNI');
+    if (!ceco) problemas.push('Sin CECO');
     if (diasN <= 0) problemas.push('Días = 0');
 
     // Validar supervisor contra lista de PROYECTOS
