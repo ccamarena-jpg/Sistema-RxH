@@ -21,6 +21,10 @@ function asegurarHeaderDiasDetalle_() {
   if (String(cell.getValue()).trim() === '') {
     cell.setValue('DIAS DETALLE');
   }
+  var cellCeco = sheet.getRange(1, 39); // AM1
+  if (String(cellCeco.getValue()).trim() === '') {
+    cellCeco.setValue('CECO');
+  }
 }
 
 // Ejecuta esta función una vez desde el editor para crear el encabezado ya mismo.
@@ -86,7 +90,8 @@ function doPost(e) {
     '',                            // AI: FECHA APROBACION CONTABILIDAD
     'No',                          // AJ: APROBADO CONTABILIDAD
     'No',                          // AK: REPORTE DE GASTOS EMITIDO
-    data.diasDetalle || ''         // AL: DIAS DETALLE (patrón de asistencia)
+    data.diasDetalle || '',        // AL: DIAS DETALLE (patrón de asistencia)
+    data.ceco || ''                // AM: CECO
   ]);
 
   // Forzar columnas L y M como texto para preservar ceros iniciales
@@ -293,7 +298,8 @@ function doGet(e) {
         aprobadoPor:  col(row, 'APROBADO POR GERENTE'),
         obsCont:      col(row, 'OBS CONTABILIDAD'),
         obsContabilidad: col(row, 'OBS CONTABILIDAD'),
-        diasDetalle:  String(row[37] || '')    // AL: patrón de asistencia
+        diasDetalle:  String(row[37] || ''),   // AL: patrón de asistencia
+        ceco:         String(col(row, 'CECO'))  // AM: centro de costos
       });
     }
     return respond({ registros: result });

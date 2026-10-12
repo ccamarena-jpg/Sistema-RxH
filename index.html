@@ -795,6 +795,10 @@
         <input type="text" id="f-cci" readonly placeholder="AUTOCOMPLETA" style="background:#f8f8f8;color:var(--text-muted)">
         <div id="f-cci-error" style="display:none;font-size:11px;color:var(--red);margin-top:4px">⚠ Debe tener exactamente 20 dígitos</div>
       </div>
+      <div class="field span-2">
+        <label>CECO <span style="font-size:10px;color:var(--text-dim)">(centro de costos)</span></label>
+        <input type="text" id="f-ceco" placeholder="Ej. 1001234" autocomplete="off">
+      </div>
     </div>
   </div>
 
@@ -1495,10 +1499,10 @@
     <div style="overflow-x:auto">
     <table class="records-table" style="font-size:12px">
       <thead><tr>
-        <th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>I</th><th>J</th><th>K</th><th>L</th><th>M</th><th>N</th><th>O … AS</th>
+        <th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>I</th><th>J</th><th>K</th><th>L</th><th>M</th><th>N</th><th>O … AS</th><th>AT</th>
       </tr></thead>
       <tbody><tr>
-        <td>Quincena</td><td>Cliente</td><td>Proyecto</td><td>Supervisor</td><td>Ej. Cuentas</td><td>DNI</td><td>Días</td><td>Pago/día</td><td>Mov.diaria</td><td>Mov.adicional</td><td>Mov.viajera</td><td>Adelanto</td><td>Megas</td><td>Otros</td><td>Día 1 … Día 31</td>
+        <td>Quincena</td><td>Cliente</td><td>Proyecto</td><td>Supervisor</td><td>Ej. Cuentas</td><td>DNI</td><td>Días</td><td>Pago/día</td><td>Mov.diaria</td><td>Mov.adicional</td><td>Mov.viajera</td><td>Adelanto</td><td>Megas</td><td>Otros</td><td>Día 1 … Día 31</td><td>CECO</td>
       </tr></tbody>
     </table>
     </div>
@@ -2777,6 +2781,7 @@ async function guardarRegistro() {
     banco:         bancoFinal,
     cuenta:        cuentaVal,
     cci:           cciVal,
+    ceco:          document.getElementById('f-ceco').value.trim().toUpperCase(),
     dias:          dias,
     pagoDia:       pagoDia,
     pagoDias:      dias * pagoDia,
@@ -2823,7 +2828,7 @@ async function guardarRegistro() {
 
 function limpiarFormulario() {
   ['f-quincena','f-cliente','f-proyecto','f-supervisor','f-dni','f-nombre','f-departamento',
-   'f-ciudad','f-cuenta','f-cci','f-dias','f-pago-dia','f-movilidad-diaria',
+   'f-ciudad','f-cuenta','f-cci','f-ceco','f-dias','f-pago-dia','f-movilidad-diaria',
    'f-mov-adicional','f-mov-viajera','f-adelanto','f-megas','f-otros'].forEach(id => {
     document.getElementById(id).value = '';
   });
@@ -4511,6 +4516,7 @@ const ADMINS_EJCUENTAS_MAP = {
   'contabilidad@ttaudit.com': '',
   'contabilidad2@ttaudit.com':'',
   'egutierrez@ttaudit.com':   '',
+  'egarcia@ttaudit.com':      '',
 };
 
 // Admins (gerentes de proyecto / ejecutivos de cuentas)
@@ -4993,6 +4999,7 @@ async function procesarExcelCarga(file) {
   for (const row of rows) {
     const [quincena, cliente, proyecto, supervisor, ejCuentas, dni,
            dias, pagoDia, movDia, movAd, movVi, adelanto, megas, otros] = row;
+    const ceco = String(row[45] || '').trim().toUpperCase();   // col AT = CECO (después de Día 31)
 
     // Matriz de asistencia: columnas 15+ (índices 14..44) = Día 1 … Día 31 (día del mes)
     const asis = {};
@@ -5038,7 +5045,7 @@ async function procesarExcelCarga(file) {
     if (esDup) problemas.push('⚠️ Duplicado');
 
     cargaFilas.push({
-      quincena, cliente, proyecto, supervisor,
+      quincena, cliente, proyecto, supervisor, ceco,
       ejCuentas: String(ejCuentas||'').trim(),
       dni: String(dni).trim(), dias: diasN, diasDetalle: diasDetalle, pagoDia: pagoDiaN,
       pagoDias, movilidadDia: movDiaN, movilidad: movilidad,
@@ -5169,7 +5176,7 @@ async function confirmarCargaMasiva() {
       supervisor: f.supervisor, ejCuentas: f.ejCuentas || '',
       nombre: f.nombre, dni: f.dni,
       departamento: f.departamento, ciudad: f.ciudad, banco: f.banco,
-      cuenta: f.cuenta, cci: f.cci, dias: f.dias, diasDetalle: f.diasDetalle || '', pagoDia: f.pagoDia,
+      cuenta: f.cuenta, cci: f.cci, ceco: f.ceco || '', dias: f.dias, diasDetalle: f.diasDetalle || '', pagoDia: f.pagoDia,
       pagoDias: f.pagoDias, movilidadDia: f.movilidadDia, movilidad: f.movilidad,
       movAdicional: f.movAdicional, movViajera: f.movViajera,
       adelanto: f.adelanto, megas: f.megas, otros: f.otros,
@@ -5221,14 +5228,14 @@ function descargarPlantilla() {
                    'Mov.viajera','Adelanto','Megas','Otros'];
   const dayHeaders = [];
   for (let d = 1; d <= 31; d++) dayHeaders.push('Día ' + d);
-  const headers = baseHeaders.concat(dayHeaders);
+  const headers = baseHeaders.concat(dayHeaders, ['CECO']);
 
   // "Días" va vacío: se calcula solo desde la matriz de días. Ejemplo Q1: días 1–15 trabajados.
   const baseEjemplo = ['Q1-ABR-2026','BAT','SS MERCH','JOSÉ MARIÑOS','PEDRO PÉREZ','12345678',
                    '', 80, 10, 0, 0, 0, 15, 0];
   const dayEjemplo = [];
   for (let d = 1; d <= 31; d++) dayEjemplo.push(d <= 15 ? 1 : '');
-  const ejemplo = baseEjemplo.concat(dayEjemplo);
+  const ejemplo = baseEjemplo.concat(dayEjemplo, ['1001234']);
 
   if (typeof XLSX !== 'undefined') {
     const wb = XLSX.utils.book_new();
