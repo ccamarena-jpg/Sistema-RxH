@@ -3899,16 +3899,16 @@ function renderAsistencia() {
 
   const info = diasDeMes(mes, parte);
   const head = '<th style="text-align:left">Trabajador</th><th style="text-align:left">Proyecto</th>'
-    + info.dias.map(d => `<th style="text-align:center;min-width:24px">${d}</th>`).join('')
+    + info.dias.map(d => `<th style="text-align:center;min-width:30px">${d}</th>`).join('')
     + '<th style="text-align:center">Total</th>';
 
   const body = filas.map(g => {
     let tot = 0;
     const cells = info.dias.map(d => {
       const v = g.pat[d];
-      if (v === 1)   { tot += 1;   return '<td style="text-align:center;background:rgba(26,58,107,0.12);color:var(--navy);font-weight:700">●</td>'; }
-      if (v === 0.5) { tot += 0.5; return '<td style="text-align:center;background:rgba(240,194,48,0.30);color:var(--accent2);font-weight:700">½</td>'; }
-      return '<td style="text-align:center;color:var(--text-dim)">·</td>';
+      if (v === 1)   { tot += 1;   return '<td style="text-align:center;background:rgba(26,58,107,0.12);color:var(--navy);font-weight:700;font-size:22px;line-height:1">●</td>'; }
+      if (v === 0.5) { tot += 0.5; return '<td style="text-align:center;background:rgba(240,194,48,0.30);color:var(--accent2);font-weight:700;font-size:16px">½</td>'; }
+      return '<td style="text-align:center;color:var(--text-dim);font-size:18px">·</td>';
     }).join('');
     // Si no hay patrón (registro viejo), mostrar la suma de "días" del campo
     const totalMostrar = g.tieneP ? tot : g.diasCampo;
@@ -3924,7 +3924,7 @@ function renderAsistencia() {
   const titulo = 'Mostrando ' + filas.length + ' persona(s) — ' + mes + (parte ? ' · ' + parte : ' · mes completo');
   wrap.innerHTML = `
     <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">${titulo}</div>
-    <table class="records-table" style="min-width:${Math.max(620, 300 + info.dias.length * 26)}px">
+    <table class="records-table" style="min-width:${Math.max(620, 300 + info.dias.length * 32)}px">
       <thead><tr>${head}</tr></thead>
       <tbody>${body}</tbody>
     </table>
