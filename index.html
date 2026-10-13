@@ -980,6 +980,7 @@
         <th>Supervisor</th>
         <th>Trabajador</th>
         <th>Proyecto</th>
+        <th>CECO</th>
         <th>Ciudad</th>
         <th>Total</th>
         <th>Estado</th>
@@ -1062,6 +1063,7 @@
         <th>Quincena</th>
         <th>Trabajador</th>
         <th>Proyecto / Cliente</th>
+        <th>CECO</th>
         <th>Ciudad</th>
         <th style="text-align:right">Honorarios</th>
         <th style="text-align:right">Movilidad</th>
@@ -1231,6 +1233,7 @@
         <th style="width:36px"><input type="checkbox" id="chk-all-cont" onchange="toggleAllCont(this)"></th>
         <th>Trabajador</th>
         <th>Proyecto</th>
+        <th>CECO</th>
         <th>Supervisor</th>
         <th>Total</th>
         <th>N° RxH</th>
@@ -3124,14 +3127,15 @@ function renderTablaAprobacion(filtro) {
   });
 
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-dim);padding:40px">Sin registros con ese filtro</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-dim);padding:40px">Sin registros con ese filtro</td></tr>';
   } else {
     tbody.innerHTML = lista.map(r => `
       <tr>
         <td>${currentUser && currentUser.role === 'supervisor' ? '' : '<input type="checkbox" class="chk-aprobacion" data-id="'+r.id+'" '+(r.estado !== 'EN REVISIÓN CUENTAS' ? 'disabled style="opacity:0.3"' : '')+' onchange="actualizarContadorCuentas()">'}</td>
         <td>${r.supervisor || '—'}</td>
         <td><strong>${r.nombre}</strong><br><span style="color:var(--text-dim);font-size:11px">${r.dni}</span></td>
-        <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span>${r.ceco ? `<br><span style="font-size:11px;color:var(--text-muted)">CECO: ${r.ceco}</span>` : ''}</td>
+        <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span></td>
+        <td style="font-size:12px">${r.ceco || '—'}</td>
         <td>${r.ciudad}</td>
         <td style="font-weight:600;color:var(--accent)">S/. ${parseFloat(r.total||0).toLocaleString('es-PE',{minimumFractionDigits:2})}</td>
         <td>${ESTADO_PILL[r.estado] || r.estado}</td>
@@ -3252,7 +3256,7 @@ function renderMisRegistros() {
   document.getElementById('mis-stat-total') && (document.getElementById('mis-stat-total').textContent = 'S/. ' + tot.toLocaleString('es-PE',{minimumFractionDigits:0}));
 
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;color:var(--text-dim);padding:40px">Sin registros con ese filtro</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--text-dim);padding:40px">Sin registros con ese filtro</td></tr>';
     return;
   }
 
@@ -3270,7 +3274,8 @@ function renderMisRegistros() {
     return `<tr ${esObservado ? 'style="background:rgba(217,115,32,0.05)"' : ''}>
       <td style="white-space:nowrap">${r.quincena || '—'}</td>
       <td><strong>${r.nombre}</strong><br><span style="font-size:11px;color:var(--text-dim)">${r.dni}</span></td>
-      <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span>${r.ceco ? `<br><span style="font-size:11px;color:var(--text-muted)">CECO: ${r.ceco}</span>` : ''}</td>
+      <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span></td>
+        <td style="font-size:12px">${r.ceco || '—'}</td>
       <td>${r.ciudad || '—'}</td>
       <td style="text-align:right">${fmt(honorarios)}</td>
       <td style="text-align:right">${fmt(movilidad)}</td>
@@ -3424,7 +3429,7 @@ function renderTablaContabilidad() {
   });
 
   if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-dim);padding:40px">Sin registros con ese filtro</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text-dim);padding:40px">Sin registros con ese filtro</td></tr>';
   } else {
     tbody.innerHTML = lista.map(r => `
       <tr>
@@ -3432,7 +3437,8 @@ function renderTablaContabilidad() {
           ${!['EN REVISIÓN CONTABILIDAD','OBSERVADO-CONTABILIDAD','APROBADO CONTABILIDAD'].includes(r.estado) ? 'disabled style="opacity:0.3"' : ''}
           onchange="actualizarContadorCont()"></td>
         <td><strong>${r.nombre}</strong><br><span style="color:var(--text-dim);font-size:11px">${r.dni}</span></td>
-        <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span>${r.ceco ? `<br><span style="font-size:11px;color:var(--text-muted)">CECO: ${r.ceco}</span>` : ''}</td>
+        <td>${r.proyecto}<br><span style="font-size:11px;color:var(--text-muted)">${r.cliente}</span></td>
+        <td style="font-size:12px">${r.ceco || '—'}</td>
         <td>${r.supervisor || '—'}</td>
         <td style="font-weight:600;color:var(--accent)">S/. ${parseFloat(r.total||0).toLocaleString('es-PE',{minimumFractionDigits:2})}</td>
         <td>${(() => {
